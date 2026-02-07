@@ -54,6 +54,7 @@ dutient-hrms/
 ### Prerequisites
 - Node.js 20+ 
 - npm or yarn
+- Supabase account (free tier available at [supabase.com](https://supabase.com))
 
 ### Installation Commands
 
@@ -64,12 +65,58 @@ cd dutient-hrms
 # Install dependencies (already done)
 npm install
 
-# Install shadcn/ui dependencies (already done)
-npm install clsx tailwind-merge class-variance-authority
+# Install Supabase client (already done)
+npm install @supabase/supabase-js
 
 # Start development server
 npm run dev
 ```
+
+### 🔐 Supabase Database Setup
+
+The application uses Supabase as its backend database. Follow these steps to set it up:
+
+#### 1. Create a Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and sign up/login
+2. Click "New Project"
+3. Enter project details:
+   - **Name**: `dutient-hrms`
+   - **Database Password**: Choose a strong password
+   - **Region**: Select closest to your location
+4. Wait for the project to be provisioned (~2 minutes)
+
+#### 2. Run the Database Schema
+
+1. In your Supabase dashboard, go to the **SQL Editor**
+2. Create a new query
+3. Copy and paste the complete SQL schema from the setup docs (includes):
+   - `candidates` table with all required columns
+   - Indexes for optimized queries
+   - Row Level Security (RLS) policies
+   - Sample data for testing
+4. Click **Run** to execute the SQL
+
+#### 3. Configure Environment Variables
+
+1. In your Supabase dashboard, go to **Settings** → **API**
+2. Copy your **Project URL** and **anon/public key**
+3. Create/update `.env.local` in your project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+4. **Important**: Replace the placeholder values with your actual credentials
+5. Restart your dev server for changes to take effect
+
+#### 4. Verify the Connection
+
+1. Start the dev server: `npm run dev`
+2. Navigate to `http://localhost:3000/candidates`
+3. You should see the sample candidates from the database
+4. If you see a yellow warning banner, double-check your credentials
 
 ### Available Scripts
 
