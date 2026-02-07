@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DM_Sans, Archivo } from "next/font/google";
 import "./globals.css";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Header } from "@/components/layout/Header";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -31,7 +33,18 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${archivo.variable} antialiased`}
       >
-        {children}
+        <div className="flex min-h-screen">
+          {/* Sidebar - Dark Theme */}
+          <Sidebar />
+
+          {/* Main Content Area - Light Theme */}
+          <div className="flex flex-1 flex-col pl-64">
+            <Header />
+            <main className="flex-1 bg-background p-8">
+              {children}
+            </main>
+          </div>
+        </div>
       </body>
     </html>
   );

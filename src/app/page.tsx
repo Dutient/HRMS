@@ -1,112 +1,247 @@
-import { Header } from "@/components/layout/Header";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Users,
+  Briefcase,
+  Calendar,
+  TrendingUp,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <main className="container mx-auto max-w-7xl px-6 py-16">
-        {/* Hero Section */}
-        <div className="flex min-h-[calc(100vh-200px)] flex-col items-center justify-center text-center">
-          <div className="mb-8 inline-block rounded-full bg-accent/10 px-6 py-2">
-            <span className="text-sm font-semibold text-accent">
-              Production-Grade ATS
-            </span>
-          </div>
-          
-          <h1 className="mb-6 font-heading text-6xl font-extrabold tracking-tight text-primary sm:text-7xl lg:text-8xl">
-            Welcome to <span className="text-accent">Dutient</span>
-          </h1>
-          
-          <p className="mb-12 max-w-2xl text-xl text-text-muted sm:text-2xl">
-            Your next-generation HR Management System. Built to handle 1,500+ resumes 
-            with powerful AI workflows and seamless candidate tracking.
-          </p>
-          
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <button className="rounded-lg bg-accent px-8 py-4 font-semibold text-white shadow-lg transition-all hover:bg-accent-hover hover:-translate-y-0.5 hover:shadow-xl">
-              Get Started
-            </button>
-            <button className="rounded-lg border-2 border-primary bg-transparent px-8 py-4 font-semibold text-primary transition-all hover:bg-primary hover:text-white">
-              View Documentation
-            </button>
-          </div>
-        </div>
+    <div className="space-y-8">
+      {/* Welcome Section */}
+      <div>
+        <h1 className="font-heading text-4xl font-bold text-primary">
+          Dashboard
+        </h1>
+        <p className="mt-2 text-lg text-text-muted">
+          Overview of your hiring pipeline and key metrics
+        </p>
+      </div>
 
-        {/* Stats Section */}
-        <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary-light p-6 text-white shadow-lg transition-transform hover:-translate-y-1"
-            >
-              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
-              <div className="relative">
-                <div className="mb-2 font-heading text-4xl font-extrabold">
-                  {stat.value}
+      {/* Stats Cards */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, index) => (
+          <Card
+            key={index}
+            className="relative overflow-hidden border-l-4 transition-all hover:shadow-lg"
+            style={{ borderLeftColor: stat.color }}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-muted">
+                    {stat.label}
+                  </p>
+                  <p className="mt-2 font-heading text-3xl font-extrabold text-primary">
+                    {stat.value}
+                  </p>
+                  <p className="mt-2 flex items-center text-sm text-success">
+                    <TrendingUp className="mr-1 h-4 w-4" />
+                    {stat.trend}
+                  </p>
                 </div>
-                <div className="text-sm opacity-90">{stat.label}</div>
+                <div
+                  className="rounded-full p-3"
+                  style={{ backgroundColor: `${stat.color}20` }}
+                >
+                  <stat.icon className="h-6 w-6" style={{ color: stat.color }} />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {/* Features Section */}
-        <div className="mt-24">
-          <h2 className="mb-12 text-center font-heading text-4xl font-bold text-primary">
-            Powered by Modern Technology
-          </h2>
-          <div className="grid gap-8 md:grid-cols-3">
-            {features.map((feature, index) => (
-              <div
+      {/* Quick Actions */}
+      <Card className="border-accent/20 bg-gradient-to-r from-accent/5 to-accent/10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 font-heading text-2xl">
+            <Sparkles className="h-6 w-6 text-accent" />
+            Quick Actions
+          </CardTitle>
+          <CardDescription>
+            Get started with common tasks
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {quickActions.map((action, index) => (
+              <Button
                 key={index}
-                className="rounded-xl bg-card p-8 shadow-md transition-shadow hover:shadow-xl"
+                variant="outline"
+                className="h-auto flex-col items-start gap-2 p-4 hover:border-accent hover:bg-accent/5"
               >
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10">
-                  <span className="text-2xl">{feature.icon}</span>
+                <action.icon className="h-5 w-5 text-accent" />
+                <div className="text-left">
+                  <p className="font-semibold">{action.title}</p>
+                  <p className="text-xs text-text-muted">{action.description}</p>
                 </div>
-                <h3 className="mb-3 font-heading text-xl font-semibold text-primary">
-                  {feature.title}
-                </h3>
-                <p className="text-text-muted">{feature.description}</p>
-              </div>
+              </Button>
             ))}
           </div>
-        </div>
-      </main>
+        </CardContent>
+      </Card>
 
-      {/* Footer */}
-      <footer className="mt-24 border-t border-border bg-card py-8">
-        <div className="container mx-auto max-w-7xl px-6 text-center text-sm text-text-muted">
-          <p>© 2026 Dutient HR Management System. Built with Next.js 16 & TypeScript.</p>
-        </div>
-      </footer>
+      {/* Recent Activity & Pipeline */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Pipeline Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading">Hiring Pipeline</CardTitle>
+            <CardDescription>Candidates by stage</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {pipelineStages.map((stage) => (
+              <div key={stage.name} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: stage.color }}
+                    />
+                    <span className="font-medium">{stage.name}</span>
+                  </div>
+                  <span className="font-semibold text-primary">
+                    {stage.count}
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${stage.percentage}%`,
+                      backgroundColor: stage.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Upcoming Interviews */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-heading">Upcoming Interviews</CardTitle>
+            <CardDescription>Scheduled for this week</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {upcomingInterviews.map((interview, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-background"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent">
+                    {interview.candidate.split(" ").map((n) => n[0]).join("")}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-primary">
+                      {interview.candidate}
+                    </p>
+                    <p className="text-sm text-text-muted">{interview.role}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-primary">
+                    {interview.time}
+                  </p>
+                  <Badge variant="outline" className="mt-1">
+                    {interview.type}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+            <Button variant="outline" className="w-full">
+              View All Interviews
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 const stats = [
-  { value: "1,500+", label: "Resumes Handled" },
-  { value: "AI-Powered", label: "Smart Workflows" },
-  { value: "Real-time", label: "Candidate Tracking" },
-  { value: "Enterprise", label: "Production Ready" },
+  {
+    label: "Active Candidates",
+    value: "23",
+    trend: "↑ 12% from last week",
+    icon: Users,
+    color: "#3B82F6",
+  },
+  {
+    label: "Ready to Deploy",
+    value: "8",
+    trend: "Target: 6 minimum",
+    icon: Briefcase,
+    color: "#10B981",
+  },
+  {
+    label: "Interviews Today",
+    value: "5",
+    trend: "3 completed",
+    icon: Calendar,
+    color: "#F59E0B",
+  },
+  {
+    label: "Offers Extended",
+    value: "12",
+    trend: "↑ 4 this month",
+    icon: TrendingUp,
+    color: "#8B5CF6",
+  },
 ];
 
-const features = [
+const quickActions = [
   {
-    icon: "⚡",
-    title: "Next.js 16",
-    description: "Built on the latest Next.js with App Router for optimal performance and developer experience",
+    title: "Add Candidate",
+    description: "Manually add a new candidate",
+    icon: Users,
   },
   {
-    icon: "🎨",
-    title: "shadcn/ui",
-    description: "Beautiful, accessible components built with Radix UI and Tailwind CSS",
+    title: "Bulk Upload",
+    description: "Upload multiple resumes",
+    icon: Briefcase,
   },
   {
-    icon: "🚀",
-    title: "TypeScript",
-    description: "Fully typed codebase for reliability and excellent developer tooling support",
+    title: "Schedule Interview",
+    description: "Set up a new interview",
+    icon: Calendar,
+  },
+];
+
+const pipelineStages = [
+  { name: "New Applications", count: 8, percentage: 80, color: "#3B82F6" },
+  { name: "Screening", count: 6, percentage: 60, color: "#F59E0B" },
+  { name: "Interview", count: 5, percentage: 50, color: "#8B5CF6" },
+  { name: "Final Round", count: 4, percentage: 40, color: "#10B981" },
+];
+
+const upcomingInterviews = [
+  {
+    candidate: "Priya Sharma",
+    role: "Frontend Developer",
+    time: "Today, 2:00 PM",
+    type: "Technical",
+  },
+  {
+    candidate: "Rahul Verma",
+    role: "Full Stack Developer",
+    time: "Today, 4:30 PM",
+    type: "HR Round",
+  },
+  {
+    candidate: "Ananya Reddy",
+    role: "UI/UX Designer",
+    time: "Tomorrow, 11:00 AM",
+    type: "Final Round",
   },
 ];
 
