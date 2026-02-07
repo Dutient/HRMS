@@ -28,6 +28,24 @@ const formatDate = (dateString: string | null) => {
   });
 };
 
+const getMatchScoreBadge = (score: number | null) => {
+  if (!score) return null;
+
+  let colorClass = "bg-danger/10 text-danger"; // < 60
+  if (score >= 80) {
+    colorClass = "bg-success/10 text-success"; // >= 80
+  } else if (score >= 60) {
+    colorClass = "bg-warning/10 text-warning"; // >= 60
+  }
+
+  return (
+    <Badge className={colorClass}>
+      <Star className="h-3 w-3 mr-1 fill-current" />
+      {score}% Match
+    </Badge>
+  );
+};
+
 export function TalentPoolList({ candidates }: TalentPoolListProps) {
   return (
     <Card>
@@ -72,7 +90,7 @@ export function TalentPoolList({ candidates }: TalentPoolListProps) {
             <CardContent className="p-6">
               <div className="flex items-start justify-between flex-col md:flex-row gap-4">
                 <div className="flex gap-4 flex-1">
-                  <Avatar className="h-16 w-16 border-2 border-success flex-shrink-0">
+                  <Avatar className="h-16 w-16 border-2 border-success shrink-0">
                     <AvatarImage src={candidate.avatar_url || ""} />
                     <AvatarFallback className="bg-success text-white font-semibold text-lg">
                       {candidate.name
@@ -91,6 +109,7 @@ export function TalentPoolList({ candidates }: TalentPoolListProps) {
                         <Badge className="bg-success text-white">
                           Ready to Deploy
                         </Badge>
+                        {getMatchScoreBadge(candidate.match_score)}
                         {candidate.rating && (
                           <div className="flex items-center gap-1 text-sm text-warning">
                             <Star className="h-4 w-4 fill-warning" />

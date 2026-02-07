@@ -44,18 +44,44 @@ const formatDate = (dateString: string) => {
   });
 };
 
+const getMatchScoreBadge = (score: number | null) => {
+  if (!score) return null;
+
+  let colorClass = "bg-danger/10 text-danger"; // < 60
+  if (score >= 80) {
+    colorClass = "bg-success/10 text-success"; // >= 80
+  } else if (score >= 60) {
+    colorClass = "bg-warning/10 text-warning"; // >= 60
+  }
+
+  return (
+    <Badge className={colorClass}>
+      <Star className="h-3 w-3 mr-1 fill-current" />
+      {score}% Match
+    </Badge>
+  );
+};
+
 export function CandidatesList({ candidates }: CandidatesListProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredCandidates = candidates.filter((candidate) => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      candidate.name.toLowerCase().includes(searchLower) ||
-      candidate.email.toLowerCase().includes(searchLower) ||
-      candidate.role.toLowerCase().includes(searchLower) ||
-      candidate.skills.some((skill) => skill.toLowerCase().includes(searchLower))
-    );
-  });
+  const filteredCandidates = candidates
+    .filter((candidate) => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        candidate.name.toLowerCase().includes(searchLower) ||
+        candidate.email.toLowerCase().includes(searchLower) ||
+        candidate.role.toLowerCase().includes(searchLower) ||
+        candidate.skills.some((skill) => skill.toLowerCase().includes(searchLower))
+      );
+    })
+    .sort((a, b) => {
+      // Sort by match_score descending (nulls last)
+      if (a.match_score === null && b.match_score === null) return 0;
+      if (a.match_score === null) return 1;
+      if (b.match_score === null) return -1;
+      return b.match_score - a.match_score;
+    });
 
   return (
     <>
@@ -114,7 +140,7 @@ export function CandidatesList({ candidates }: CandidatesListProps) {
               <div className="flex items-start justify-between flex-col md:flex-row gap-4">
                 {/* Left Section */}
                 <div className="flex gap-4 flex-1">
-                  <Avatar className="h-16 w-16 flex-shrink-0">
+                  <Avatar className="h-16 w-16 shrink-0">
                     <AvatarImage src={candidate.avatar_url || ""} />
                     <AvatarFallback className="bg-accent text-white font-semibold text-lg">
                       {candidate.name
@@ -133,6 +159,7 @@ export function CandidatesList({ candidates }: CandidatesListProps) {
                         <Badge className={getStatusColor(candidate.status)}>
                           {candidate.status}
                         </Badge>
+                        {getMatchScoreBadge(candidate.match_score)}
                       </div>
                       <p className="text-base text-text-muted">{candidate.role}</p>
                     </div>
