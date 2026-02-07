@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -173,7 +173,6 @@ export function Header({ className }: HeaderProps) {
         {/* User Profile */}
         <div className="flex items-center gap-2 md:gap-3 rounded-lg border border-border px-2 md:px-3 py-1.5 md:py-2 transition-colors hover:bg-background">
           <Avatar className="h-8 w-8 md:h-9 md:w-9">
-            <AvatarImage src="/avatar-placeholder.png" alt="User" />
             <AvatarFallback className="bg-accent text-white font-semibold text-sm">
               KS
             </AvatarFallback>
