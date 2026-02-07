@@ -1,36 +1,169 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dutient HR Management System (HRS)
 
-## Getting Started
+A production-grade Applicant Tracking System built with Next.js 16, TypeScript, and Tailwind CSS. Designed to handle 1,500+ resumes with complex AI workflows.
 
-First, run the development server:
+## 🚀 Technology Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Next.js 16** - App Router with Server Components
+- **TypeScript** - Full type safety
+- **Tailwind CSS 4** - Utility-first styling with CSS variables
+- **shadcn/ui** - High-quality, accessible component library
+- **React 19** - Latest React features
+
+## 🎨 Design System
+
+The project uses the Dutient brand design tokens extracted from the prototype:
+
+### Colors
+- **Primary**: `#0F172A` (slate-900)
+- **Primary Light**: `#1E293B` (slate-800)
+- **Accent**: `#F59E0B` (amber-500)
+- **Accent Hover**: `#D97706` (amber-600)
+- **Success**: `#10B981` (emerald-500)
+- **Danger**: `#EF4444` (red-500)
+- **Background**: `#F8FAFC` (slate-50)
+- **Text Muted**: `#64748B` (slate-500)
+
+### Typography
+- **Body Font**: DM Sans (400, 500, 700)
+- **Heading Font**: Archivo (300, 400, 600, 800)
+
+## 📁 Project Structure
+
+```
+dutient-hrms/
+├── src/
+│   ├── app/              # Next.js App Router
+│   │   ├── api/          # API routes
+│   │   ├── globals.css   # Global styles & design tokens
+│   │   ├── layout.tsx    # Root layout
+│   │   └── page.tsx      # Home page
+│   ├── components/
+│   │   ├── ui/           # shadcn/ui components
+│   │   └── layout/       # Layout components (Header, Footer, etc.)
+│   ├── lib/              # Utility functions
+│   ├── hooks/            # Custom React hooks
+│   └── types/            # TypeScript type definitions
+├── public/               # Static assets
+├── docs/                 # Documentation & prototypes
+└── components.json       # shadcn/ui configuration
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Setup Instructions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Prerequisites
+- Node.js 20+ 
+- npm or yarn
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Installation Commands
 
-## Learn More
+```bash
+# Navigate to project directory
+cd dutient-hrms
 
-To learn more about Next.js, take a look at the following resources:
+# Install dependencies (already done)
+npm install
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Install shadcn/ui dependencies (already done)
+npm install clsx tailwind-merge class-variance-authority
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Start development server
+npm run dev
+```
 
-## Deploy on Vercel
+### Available Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Start development server (http://localhost:3000)
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Run ESLint
+npm run lint
+```
+
+## 🎯 Adding shadcn/ui Components
+
+The project is configured for shadcn/ui. To add components:
+
+```bash
+# Add specific components
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add input
+npx shadcn@latest add dialog
+npx shadcn@latest add table
+```
+
+Components will be automatically added to `src/components/ui/`.
+
+## 🎨 Using Design Tokens
+
+The design tokens are configured in `src/app/globals.css` and can be used in your components:
+
+```tsx
+// Using Tailwind classes with custom colors
+<div className="bg-primary text-white">
+  <h1 className="font-heading text-accent">Dutient</h1>
+  <p className="text-text-muted">Welcome to Dutient HRS</p>
+</div>
+
+// Using CSS variables directly
+<div style={{ backgroundColor: 'var(--primary)' }}>
+  Custom content
+</div>
+```
+
+## 🔧 Configuration Files
+
+### `components.json`
+shadcn/ui configuration with path aliases:
+- `@/components` → `src/components`
+- `@/lib` → `src/lib`
+- `@/hooks` → `src/hooks`
+
+### `tsconfig.json`
+TypeScript configuration with path aliases pre-configured.
+
+### `tailwind.config.ts`
+Tailwind CSS 4 uses CSS-based configuration in `globals.css` via `@theme` directive.
+
+## 🌐 Development Workflow
+
+1. **Start the dev server**: `npm run dev`
+2. **Open browser**: Navigate to `http://localhost:3000`
+3. **Edit files**: Changes hot-reload automatically
+4. **Add components**: Use shadcn/ui CLI or create custom components in `src/components/`
+
+## 📦 Next Steps
+
+1. **Add shadcn/ui components** as needed for your features
+2. **Create API routes** in `src/app/api/` for backend functionality
+3. **Build reusable hooks** in `src/hooks/`
+4. **Define TypeScript types** in `src/types/`
+5. **Implement AI workflows** for resume processing
+6. **Set up database** (Prisma, Drizzle, or your choice)
+7. **Configure authentication** (NextAuth.js, Clerk, etc.)
+
+## 🎓 Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [shadcn/ui Components](https://ui.shadcn.com/)
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+
+## 📝 Notes
+
+- The project uses **Next.js 16** (latest version!)
+- Tailwind CSS 4 uses a new CSS-first configuration approach
+- All design tokens from the prototype are configured and ready to use
+- The folder structure is optimized for scalability (1,500+ resumes)
+
+---
+
+**Built with ❤️ for Dutient HR Management System**
