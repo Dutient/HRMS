@@ -56,7 +56,7 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen w-64 bg-primary border-r border-primary-light",
+        "fixed left-0 top-0 z-40 h-screen w-64 bg-primary border-r border-primary-light hidden md:flex md:flex-col",
         className
       )}
     >

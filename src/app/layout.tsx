@@ -34,13 +34,13 @@ export default function RootLayout({
         className={`${dmSans.variable} ${archivo.variable} antialiased`}
       >
         <div className="flex min-h-screen">
-          {/* Sidebar - Dark Theme */}
+          {/* Sidebar - Dark Theme (Hidden on Mobile) */}
           <Sidebar />
 
           {/* Main Content Area - Light Theme */}
-          <div className="flex flex-1 flex-col pl-64">
+          <div className="flex flex-1 flex-col md:pl-64">
             <Header />
-            <main className="flex-1 bg-background p-8">
+            <main className="flex-1 bg-background p-4 md:p-8">
               {children}
             </main>
           </div>
