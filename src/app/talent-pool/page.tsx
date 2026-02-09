@@ -1,14 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
-import { getCandidates } from "@/app/actions/get-candidates";
+import { getTalentPoolCandidates } from "@/app/actions/get-candidates";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { CandidatesList } from "@/components/candidates/candidates-list";
+import { TalentPoolList } from "@/components/candidates/talent-pool-list";
 import { SupabaseSetupBanner } from "@/components/candidates/supabase-setup-banner";
-import { AISearchPanel } from "@/components/candidates/ai-search-panel";
 
-export default async function CandidatesPage() {
-  // Fetch all candidates from Supabase
-  const allCandidates = await getCandidates();
+export default async function TalentPoolPage() {
+  const talentPoolCandidates = await getTalentPoolCandidates();
 
   return (
     <div className="space-y-6">
@@ -19,23 +17,20 @@ export default async function CandidatesPage() {
       <div className="flex items-center justify-between flex-col md:flex-row gap-4">
         <div>
           <h1 className="font-heading text-4xl font-bold text-primary">
-            All Candidates
+            Talent Pool
           </h1>
           <p className="mt-2 text-text-muted">
-            Browse, search, and manage all candidate profiles
+            High-potential candidates for future opportunities
           </p>
         </div>
         <Badge variant="secondary" className="text-base px-4 py-2">
           <Users className="mr-2 h-4 w-4" />
-          {allCandidates.length} Candidate{allCandidates.length !== 1 ? 's' : ''}
+          {talentPoolCandidates.length} Candidate{talentPoolCandidates.length !== 1 ? 's' : ''}
         </Badge>
       </div>
 
-      {/* AI Smart Search & Ranking */}
-      <AISearchPanel />
-
-      {/* Candidates List */}
-      <CandidatesList candidates={allCandidates} />
+      {/* Talent Pool List */}
+      <TalentPoolList candidates={talentPoolCandidates} />
     </div>
   );
 }
