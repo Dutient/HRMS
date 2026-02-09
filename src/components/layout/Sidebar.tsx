@@ -11,6 +11,7 @@ import {
   BarChart3,
   FileUp,
   Settings,
+  Mail,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -42,6 +43,11 @@ const navigation = [
     name: "Analytics",
     href: "/analytics",
     icon: BarChart3,
+  },
+  {
+    name: "Templates",
+    href: "/templates",
+    icon: Mail,
   },
   {
     name: "Bulk Upload",
