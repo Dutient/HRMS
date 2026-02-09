@@ -55,3 +55,17 @@ export interface Candidate {
   last_engaged: string | null;
   updated_at: string;
 }
+
+export interface Interview {
+  id: string;
+  candidate_id: string;
+  interviewer_name: string;
+  interview_date: string;
+  interview_type: "Screening" | "Technical" | "Final" | "HR";
+  status: "Scheduled" | "Completed" | "Cancelled";
+  meeting_link: string | null;
+  feedback_score: number | null;
+  feedback_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}

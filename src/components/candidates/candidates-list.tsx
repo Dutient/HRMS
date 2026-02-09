@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Candidate } from "@/lib/supabase";
+import { ScheduleDialog } from "@/components/interviews/schedule-dialog";
 
 interface CandidatesListProps {
   candidates: Candidate[];
@@ -228,9 +229,15 @@ export function CandidatesList({ candidates }: CandidatesListProps) {
                   <Button size="sm" className="bg-accent hover:bg-accent-hover">
                     View Profile
                   </Button>
-                  <Button size="sm" variant="outline">
-                    Schedule Interview
-                  </Button>
+                  <ScheduleDialog
+                    candidateId={candidate.id}
+                    candidateName={candidate.name}
+                    trigger={
+                      <Button size="sm" variant="outline">
+                        Schedule Interview
+                      </Button>
+                    }
+                  />
                 </div>
               </div>
             </CardContent>

@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import type { Candidate } from "@/lib/supabase";
+import { ScheduleDialog } from "@/components/interviews/schedule-dialog";
 
 interface TalentPoolListProps {
   candidates: Candidate[];
@@ -173,9 +174,15 @@ export function TalentPoolList({ candidates }: TalentPoolListProps) {
                   <Button size="sm" className="bg-success hover:bg-success/90">
                     Deploy Now
                   </Button>
-                  <Button size="sm" variant="outline">
-                    View Details
-                  </Button>
+                  <ScheduleDialog
+                    candidateId={candidate.id}
+                    candidateName={candidate.name}
+                    trigger={
+                      <Button size="sm" variant="outline">
+                        Schedule Interview
+                      </Button>
+                    }
+                  />
                 </div>
               </div>
             </CardContent>
