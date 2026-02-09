@@ -69,3 +69,13 @@ export interface Interview {
   created_at: string;
   updated_at: string;
 }
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  type: "rejection" | "offer" | "invite";
+  subject: string;
+  body: string;
+  last_updated: string;
+  created_at: string;
+}
