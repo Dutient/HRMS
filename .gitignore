@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 
 # documentation
-docs/AI_SMART_SEARCH_IMPLEMENTATION.md
+*.md
