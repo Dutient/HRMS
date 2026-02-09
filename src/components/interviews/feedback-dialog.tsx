@@ -97,7 +97,7 @@ export function FeedbackDialog({ interviewId, candidateName, interviewType, trig
         <DialogHeader>
           <DialogTitle>Interview Feedback</DialogTitle>
           <DialogDescription>
-            Provide feedback for <span className="font-semibold text-primary">{candidateName}</span>'s {interviewType} interview
+            Provide feedback for <span className="font-semibold text-primary">{candidateName}</span>{`'s`} {interviewType} interview
           </DialogDescription>
         </DialogHeader>
 
