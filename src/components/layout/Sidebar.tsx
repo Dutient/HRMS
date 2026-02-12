@@ -6,12 +6,8 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
-  Briefcase,
-  Calendar,
-  BarChart3,
   FileUp,
   Settings,
-  Mail,
 } from "lucide-react";
 
 interface SidebarProps {

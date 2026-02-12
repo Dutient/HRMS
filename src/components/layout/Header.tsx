@@ -19,12 +19,8 @@ import {
   Menu,
   LayoutDashboard,
   Users,
-  Briefcase,
-  Calendar,
-  BarChart3,
   FileUp,
   Settings,
-  Mail,
 } from "lucide-react";
 
 interface HeaderProps {
