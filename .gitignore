@@ -42,3 +42,7 @@ next-env.d.ts
 
 # documentation
 *.md
+
+# PRIVATE DOCUMENTATION (Do Not Push)
+docs/Dutient HRMS - PRD.pdf
+docs/*.pdf
