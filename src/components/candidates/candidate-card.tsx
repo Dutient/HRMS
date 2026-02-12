@@ -13,13 +13,14 @@ import {
   Upload,
   Globe,
   UserPlus,
+  ExternalLink,
+  FileText,
 } from "lucide-react";
 import type { Candidate } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 
 interface CandidateCardProps {
   candidate: Candidate;
-  onViewProfile?: (id: string) => void;
-  onScheduleInterview?: (id: string) => void;
 }
 
 const getMatchScoreBadge = (score: number | null) => {
@@ -56,11 +57,43 @@ const getSourceIcon = (source: string | null) => {
   return <IconComponent className="h-3.5 w-3.5" />;
 };
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
 export function CandidateCard({
   candidate,
-  onViewProfile,
-  onScheduleInterview,
 }: CandidateCardProps) {
+  const { toast } = useToast();
+
+  const handleViewProfile = () => {
+    if (!candidate.resume_url) {
+      toast({
+        title: "No resume available",
+        description: "This candidate doesn't have a resume uploaded yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Open resume in new tab
+    window.open(candidate.resume_url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleScheduleInterview = () => {
+    const subject = encodeURIComponent(`Interview Invitation - ${candidate.role} Position`);
+    const body = encodeURIComponent(
+      `Dear ${candidate.name},\n\nWe are pleased to invite you for an interview for the ${candidate.role} position.\n\nPlease let us know your availability.\n\nBest regards,\nHR Team`
+    );
+    
+    const mailtoLink = `mailto:${candidate.email}?subject=${subject}&body=${body}`;
+    window.location.href = mailtoLink;
+  };
   return (
     <Card className="transition-all hover:shadow-lg hover:border-accent/40">
       <CardContent className="p-5 space-y-4">
@@ -117,6 +150,11 @@ export function CandidateCard({
               <span>{candidate.experience} years experience</span>
             </div>
           )}
+          {candidate.applied_date && (
+            <div className="flex items-center gap-2 text-text-muted text-xs">
+              <span>Applied: {formatDate(candidate.applied_date)}</span>
+            </div>
+          )}
         </div>
 
         {/* Skills Tags */}
@@ -148,15 +186,28 @@ export function CandidateCard({
             size="sm"
             variant="outline"
             className="flex-1"
-            onClick={() => onViewProfile?.(candidate.id)}
+            onClick={handleViewProfile}
+            disabled={!candidate.resume_url}
           >
-            View Profile
+            {candidate.resume_url ? (
+              <>
+                <FileText className="mr-2 h-4 w-4" />
+                View Resume
+                <ExternalLink className="ml-2 h-3 w-3" />
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-4 w-4" />
+                No Resume
+              </>
+            )}
           </Button>
           <Button
             size="sm"
             className="flex-1 bg-accent hover:bg-accent-hover"
-            onClick={() => onScheduleInterview?.(candidate.id)}
+            onClick={handleScheduleInterview}
           >
+            <Mail className="mr-2 h-4 w-4" />
             Schedule Interview
           </Button>
         </div>

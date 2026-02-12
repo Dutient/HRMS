@@ -11,16 +11,6 @@ interface CandidatesGridProps {
 }
 
 export function CandidatesGrid({ candidates }: CandidatesGridProps) {
-  const handleViewProfile = (id: string) => {
-    // TODO: Navigate to candidate profile page
-    console.log("View profile:", id);
-  };
-
-  const handleScheduleInterview = (id: string) => {
-    // TODO: Open schedule interview dialog
-    console.log("Schedule interview:", id);
-  };
-
   if (candidates.length === 0) {
     return (
       <Card className="p-12">
@@ -46,8 +36,6 @@ export function CandidatesGrid({ candidates }: CandidatesGridProps) {
         <CandidateCard
           key={candidate.id}
           candidate={candidate}
-          onViewProfile={handleViewProfile}
-          onScheduleInterview={handleScheduleInterview}
         />
       ))}
     </div>
