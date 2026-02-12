@@ -20,40 +20,41 @@ interface SidebarProps {
 
 const navigation = [
   {
-    name: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
     name: "Candidates",
     href: "/candidates",
     icon: Users,
-  },
-  {
-    name: "Talent Pool",
-    href: "/talent-pool",
-    icon: Briefcase,
-  },
-  {
-    name: "Interviews",
-    href: "/interviews",
-    icon: Calendar,
-  },
-  {
-    name: "Analytics",
-    href: "/analytics",
-    icon: BarChart3,
-  },
-  {
-    name: "Templates",
-    href: "/templates",
-    icon: Mail,
   },
   {
     name: "Bulk Upload",
     href: "/bulk-upload",
     icon: FileUp,
   },
+  {
+    name: "Dashboard",
+    href: "/",
+    icon: LayoutDashboard,
+  },
+  // Phase 2 - Commented out for now
+  // {
+  //   name: "Talent Pool",
+  //   href: "/talent-pool",
+  //   icon: Briefcase,
+  // },
+  // {
+  //   name: "Interviews",
+  //   href: "/interviews",
+  //   icon: Calendar,
+  // },
+  // {
+  //   name: "Analytics",
+  //   href: "/analytics",
+  //   icon: BarChart3,
+  // },
+  // {
+  //   name: "Templates",
+  //   href: "/templates",
+  //   icon: Mail,
+  // },
 ];
 
 export function Sidebar({ className }: SidebarProps) {
