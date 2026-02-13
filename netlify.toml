@@ -10,6 +10,17 @@
   # Node version compatible with Next.js 16
   NODE_VERSION = "20"
 
+# Increase function timeout for AI operations (bulk upload, ranking)
+[functions]
+  node_bundler = "esbuild"
+  # 60 seconds timeout for AI-heavy operations
+  # Needed for: Rank All Candidates, Bulk Resume Upload with AI parsing
+  included_files = ["**"]
+
+[functions."___netlify-server-handler"]
+  node_bundler = "esbuild"
+  included_files = ["**"]
+
 # Headers for security and large file uploads
 [[headers]]
   for = "/*"
@@ -18,4 +29,10 @@
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Increase the timeout for the server action on the candidates page.
+# The ranking process can take longer than the default 10 seconds.
+[functions]
+[functions."___netlify-handler"]
+  timeout = 60 # Set timeout to 60 seconds
 
