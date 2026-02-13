@@ -178,7 +178,7 @@ export default async function Home() {
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent text-sm flex-shrink-0">
-                          {candidate.name.split(" ").map((n) => n[0]).join("")}
+                          {candidate.name.split(" ").map((n: string) => n[0]).join("")}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-primary truncate">
