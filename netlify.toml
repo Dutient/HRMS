@@ -1,0 +1,53 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Essential Next.js plugin for Netlify
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[functions]
+  # Increase timeout for bulk upload operations
+  node_bundler = "esbuild"
+  included_files = [".next/**"]
+
+[build.environment]
+  # Node version compatible with Next.js 16
+  NODE_VERSION = "20"
+  # Required environment variables for Next.js Server Actions
+  NEXT_PRIVATE_TARGET = "server"
+
+# Redirect all requests to Next.js
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/___netlify-handler"
+  status = 200
+  force = false
+
+# Headers for Server Actions and large file uploads
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Allow large request bodies for bulk upload
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    # Server Actions configuration
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Configure function size limits
+[functions.___netlify-handler]
+  included_files = [".next/**"]
+  node_bundler = "esbuild"
+
+# Large body size for file uploads (100MB)
+[dev]
+  framework = "next"
+  targetPort = 3000

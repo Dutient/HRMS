@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "ernvohwbroesxzokrwbl.supabase.co",
+        hostname: "blcknmysmaxkoprusixt.supabase.co",
         port: "",
         pathname: "/storage/v1/object/public/**",
       },
@@ -17,7 +17,12 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb", // Allow 50 resumes @ ~2MB each (increased from 50mb for safety)
-      allowedOrigins: ["localhost:3000", "127.0.0.1:3000"], // Allow localhost
+      allowedOrigins: [
+        "localhost:3000",
+        "127.0.0.1:3000",
+        "dutient-hrms.netlify.app",
+        "*.netlify.app", // Allow all Netlify preview deployments
+      ],
     },
     proxyClientMaxBodySize: "100mb", // Allow large file uploads through proxy.ts
   },
