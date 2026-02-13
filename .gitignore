@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Project audit (internal documentation)
+PROJECT_AUDIT.md
+
 # documentation
 *.md
 

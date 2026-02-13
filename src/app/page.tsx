@@ -1,19 +1,42 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Users,
-  Briefcase,
-  Calendar,
-  TrendingUp,
-  ArrowRight,
-  Sparkles,
-} from "lucide-react";
+import { Users, Briefcase, Calendar, TrendingUp, ArrowRight, Plus, Upload } from "lucide-react";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import Link from "next/link";
+import { format } from "date-fns";
 
-export default function Home() {
+async function getDashboardData() {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      totalCandidates: 0,
+      recentCandidates: [],
+    };
+  }
+
+  // Fetch total candidates count
+  const { count: totalCandidates } = await supabase
+    .from("candidates")
+    .select("*", { count: "exact", head: true });
+
+  // Fetch 5 most recent candidates
+  const { data: recentCandidates } = await supabase
+    .from("candidates")
+    .select("id, name, role, applied_date")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  return {
+    totalCandidates: totalCandidates || 0,
+    recentCandidates: recentCandidates || [],
+  };
+}
+
+export default async function Home() {
+  const { totalCandidates, recentCandidates } = await getDashboardData();
+
   return (
     <div className="space-y-6 md:space-y-8">
-      {/* Welcome Section */}
+      {/* Page Header */}
       <div>
         <h1 className="font-heading text-3xl md:text-4xl font-bold text-primary">
           Dashboard
@@ -23,225 +46,189 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Metrics Grid - 4 Cards */}
       <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <Card
-            key={index}
-            className="relative overflow-hidden border-l-4 transition-all hover:shadow-lg"
-            style={{ borderLeftColor: stat.color }}
-          >
-            <CardContent className="pt-4 md:pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="text-xs md:text-sm font-medium text-text-muted">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
-                    {stat.value}
-                  </p>
-                  <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-success">
-                    <TrendingUp className="mr-1 h-3 w-3 md:h-4 md:w-4" />
-                    {stat.trend}
-                  </p>
-                </div>
-                <div
-                  className="rounded-full p-2 md:p-3 flex-shrink-0"
-                  style={{ backgroundColor: `${stat.color}20` }}
-                >
-                  <stat.icon className="h-5 w-5 md:h-6 md:w-6" style={{ color: stat.color }} />
-                </div>
+        {/* Card 1: Total Candidates (Real Data) */}
+        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#3B82F6" }}>
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs md:text-sm font-medium text-text-muted">
+                  Total Candidates
+                </p>
+                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
+                  {totalCandidates}
+                </p>
+                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-success">
+                  <TrendingUp className="mr-1 h-3 w-3 md:h-4 md:w-4" />
+                  Active pipeline
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <Card className="border-accent/20 bg-gradient-to-r from-accent/5 to-accent/10">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-heading text-xl md:text-2xl">
-            <Sparkles className="h-5 w-5 md:h-6 md:w-6 text-accent" />
-            Quick Actions
-          </CardTitle>
-          <CardDescription className="text-sm md:text-base">
-            Get started with common tasks
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {quickActions.map((action, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                className="h-auto flex-col items-start gap-2 p-3 md:p-4 hover:border-accent hover:bg-accent/5"
+              <div
+                className="rounded-full p-2 md:p-3 flex-shrink-0"
+                style={{ backgroundColor: "#3B82F620" }}
               >
-                <action.icon className="h-4 w-4 md:h-5 md:w-5 text-accent" />
-                <div className="text-left">
-                  <p className="text-sm md:text-base font-semibold">{action.title}</p>
-                  <p className="text-xs text-text-muted">{action.description}</p>
-                </div>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity & Pipeline */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
-        {/* Pipeline Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-lg md:text-xl">Hiring Pipeline</CardTitle>
-            <CardDescription className="text-sm md:text-base">Candidates by stage</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 md:space-y-4">
-            {pipelineStages.map((stage) => (
-              <div key={stage.name} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: stage.color }}
-                    />
-                    <span className="font-medium">{stage.name}</span>
-                  </div>
-                  <span className="font-semibold text-primary">
-                    {stage.count}
-                  </span>
-                </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-border">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${stage.percentage}%`,
-                      backgroundColor: stage.color,
-                    }}
-                  />
-                </div>
+                <Users className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#3B82F6" }} />
               </div>
-            ))}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Upcoming Interviews */}
+        {/* Card 2: Ready to Deploy */}
+        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#10B981" }}>
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs md:text-sm font-medium text-text-muted">
+                  Ready to Deploy
+                </p>
+                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
+                  0
+                </p>
+                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-text-muted">
+                  Target: 6 minimum
+                </p>
+              </div>
+              <div
+                className="rounded-full p-2 md:p-3 flex-shrink-0"
+                style={{ backgroundColor: "#10B98120" }}
+              >
+                <Briefcase className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#10B981" }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Interviews Today */}
+        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#F59E0B" }}>
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs md:text-sm font-medium text-text-muted">
+                  Interviews Today
+                </p>
+                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
+                  0
+                </p>
+                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-text-muted">
+                  No interviews scheduled
+                </p>
+              </div>
+              <div
+                className="rounded-full p-2 md:p-3 flex-shrink-0"
+                style={{ backgroundColor: "#F59E0B20" }}
+              >
+                <Calendar className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#F59E0B" }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Selection Rate */}
+        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#8B5CF6" }}>
+          <CardContent className="pt-4 md:pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs md:text-sm font-medium text-text-muted">
+                  Selection Rate
+                </p>
+                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
+                  12%
+                </p>
+                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-success">
+                  <TrendingUp className="mr-1 h-3 w-3 md:h-4 md:w-4" />
+                  Industry average
+                </p>
+              </div>
+              <div
+                className="rounded-full p-2 md:p-3 flex-shrink-0"
+                style={{ backgroundColor: "#8B5CF620" }}
+              >
+                <TrendingUp className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#8B5CF6" }} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content Grid: Recent Activity + Quick Actions */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
+        {/* Recent Activity - Takes 2 columns on larger screens */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="font-heading text-xl md:text-2xl">Recent Candidates</CardTitle>
+            <CardDescription>Latest additions to your talent pipeline</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentCandidates.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="mx-auto h-12 w-12 text-text-muted mb-3" />
+                <p className="text-text-muted">No candidates yet</p>
+                <p className="text-sm text-text-muted mt-1">
+                  Start by adding candidates or uploading resumes
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {recentCandidates.map((candidate) => (
+                    <div
+                      key={candidate.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-background transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent text-sm flex-shrink-0">
+                          {candidate.name.split(" ").map((n) => n[0]).join("")}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-primary truncate">
+                            {candidate.name}
+                          </p>
+                          <p className="text-sm text-text-muted truncate">{candidate.role}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <p className="text-xs text-text-muted">
+                          {format(new Date(candidate.applied_date), "MMM dd, yyyy")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/candidates">
+                  <Button variant="outline" className="w-full mt-4">
+                    View All Candidates
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions - Takes 1 column */}
         <Card>
           <CardHeader>
-            <CardTitle className="font-heading text-lg md:text-xl">Upcoming Interviews</CardTitle>
-            <CardDescription className="text-sm md:text-base">Scheduled for this week</CardDescription>
+            <CardTitle className="font-heading text-xl md:text-2xl">Quick Actions</CardTitle>
+            <CardDescription>Common recruitment tasks</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 md:space-y-4">
-            {upcomingInterviews.map((interview, index) => (
-              <div
-                key={index}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg border border-border p-3 md:p-4 transition-colors hover:bg-background"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent text-sm md:text-base flex-shrink-0">
-                    {interview.candidate.split(" ").map((n) => n[0]).join("")}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-primary text-sm md:text-base truncate">
-                      {interview.candidate}
-                    </p>
-                    <p className="text-xs md:text-sm text-text-muted truncate">{interview.role}</p>
-                  </div>
-                </div>
-                <div className="text-left sm:text-right w-full sm:w-auto">
-                  <p className="text-xs md:text-sm font-medium text-primary">
-                    {interview.time}
-                  </p>
-                  <Badge variant="outline" className="mt-1 text-xs">
-                    {interview.type}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-            <Button variant="outline" className="w-full">
-              View All Interviews
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+          <CardContent className="space-y-3">
+            <Link href="/candidates">
+              <Button className="w-full bg-accent hover:bg-accent-hover">
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Candidate
+              </Button>
+            </Link>
+            <Link href="/bulk-upload">
+              <Button variant="outline" className="w-full">
+                <Upload className="mr-2 h-4 w-4" />
+                Bulk Upload Resumes
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-
-const stats = [
-  {
-    label: "Active Candidates",
-    value: "23",
-    trend: "↑ 12% from last week",
-    icon: Users,
-    color: "#3B82F6",
-  },
-  {
-    label: "Ready to Deploy",
-    value: "8",
-    trend: "Target: 6 minimum",
-    icon: Briefcase,
-    color: "#10B981",
-  },
-  {
-    label: "Interviews Today",
-    value: "5",
-    trend: "3 completed",
-    icon: Calendar,
-    color: "#F59E0B",
-  },
-  {
-    label: "Offers Extended",
-    value: "12",
-    trend: "↑ 4 this month",
-    icon: TrendingUp,
-    color: "#8B5CF6",
-  },
-];
-
-const quickActions = [
-  {
-    title: "Add Candidate",
-    description: "Manually add a new candidate",
-    icon: Users,
-  },
-  {
-    title: "Bulk Upload",
-    description: "Upload multiple resumes",
-    icon: Briefcase,
-  },
-  {
-    title: "Schedule Interview",
-    description: "Set up a new interview",
-    icon: Calendar,
-  },
-];
-
-const pipelineStages = [
-  { name: "New Applications", count: 8, percentage: 80, color: "#3B82F6" },
-  { name: "Screening", count: 6, percentage: 60, color: "#F59E0B" },
-  { name: "Interview", count: 5, percentage: 50, color: "#8B5CF6" },
-  { name: "Final Round", count: 4, percentage: 40, color: "#10B981" },
-];
-
-const upcomingInterviews = [
-  {
-    candidate: "Priya Sharma",
-    role: "Frontend Developer",
-    time: "Today, 2:00 PM",
-    type: "Technical",
-  },
-  {
-    candidate: "Rahul Verma",
-    role: "Full Stack Developer",
-    time: "Today, 4:30 PM",
-    type: "HR Round",
-  },
-  {
-    candidate: "Ananya Reddy",
-    role: "UI/UX Designer",
-    time: "Tomorrow, 11:00 AM",
-    type: "Final Round",
-  },
-];
 
