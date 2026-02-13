@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-import { processResume } from "@/app/actions/process-resume";
+import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from "react";
+import { uploadResumesAndCreateCandidates } from "@/app/actions/bulk-upload-resumes";
 
 interface FileStatus {
   name: string;
@@ -28,6 +28,14 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const [uploadedCount, setUploadedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [filesQueue, setFilesQueue] = useState<FileStatus[]>([]);
+  const uploadAbortRef = useRef(false);
+
+  // Reset abort flag when upload starts
+  useEffect(() => {
+    if (isUploading) {
+      uploadAbortRef.current = false;
+    }
+  }, [isUploading]);
 
   const startUpload = useCallback(async (files: File[]) => {
     // Validate file count
@@ -47,71 +55,42 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setTotalCount(files.length);
     setUploadedCount(0);
     setProgress(0);
+    uploadAbortRef.current = false;
 
-    // Process files sequentially
-    for (let i = 0; i < files.length; i++) {
-      // Update current file status to processing
-      setFilesQueue((prev) =>
-        prev.map((file, index) =>
-          index === i ? { ...file, status: "processing" } : file
-        )
-      );
+    // Process all files at once using bulk upload
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
 
-      // Create FormData for this file
-      const formData = new FormData();
-      formData.append("file", files[i]);
+    try {
+      // Call bulk upload action
+      const results = await uploadResumesAndCreateCandidates(formData);
 
-      try {
-        // Process the resume
-        const result = await processResume(formData);
+      // Update queue with results
+      const updatedQueue = results.map((result) => ({
+        name: result.fileName,
+        status: result.success ? ("success" as const) : ("error" as const),
+        message: result.message,
+        candidateName: result.candidateName,
+      }));
 
-        // Update file status based on result
-        setFilesQueue((prev) =>
-          prev.map((file, index) =>
-            index === i
-              ? {
-                  ...file,
-                  status: result.success ? "success" : "error",
-                  message: result.message,
-                  candidateName: result.candidateName,
-                }
-              : file
-          )
-        );
+      setFilesQueue(updatedQueue);
+      setUploadedCount(results.length);
+      setProgress(100);
 
-        // Update progress
-        const completed = i + 1;
-        setUploadedCount(completed);
-        setProgress(Math.round((completed / files.length) * 100));
-
-        // Small delay between requests to avoid rate limiting
-        if (i < files.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-      } catch (error) {
-        // Handle unexpected errors
-        setFilesQueue((prev) =>
-          prev.map((file, index) =>
-            index === i
-              ? {
-                  ...file,
-                  status: "error",
-                  message: error instanceof Error ? error.message : "Unexpected error occurred",
-                }
-              : file
-          )
-        );
-
-        // Still update progress even on error
-        const completed = i + 1;
-        setUploadedCount(completed);
-        setProgress(Math.round((completed / files.length) * 100));
-      }
+    } catch (error) {
+      // Handle unexpected errors
+      console.error("Upload error:", error);
+      const errorQueue = files.map((file) => ({
+        name: file.name,
+        status: "error" as const,
+        message: error instanceof Error ? error.message : "Unexpected error occurred",
+      }));
+      setFilesQueue(errorQueue);
+    } finally {
+      setIsUploading(false);
     }
-
-    // Upload complete
-    setIsUploading(false);
-    setProgress(100);
   }, []);
 
   const clearQueue = useCallback(() => {

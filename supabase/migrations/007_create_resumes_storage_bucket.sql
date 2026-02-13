@@ -13,26 +13,28 @@
 
 -- Allow public access to read files
 DROP POLICY IF EXISTS "Public Access" ON storage.objects;
-CREATE POLICY "Public Access"
+DROP POLICY IF EXISTS "Public read access" ON storage.objects;
+CREATE POLICY "Public read access"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'resumes');
 
--- Allow authenticated uploads (change to allow public uploads if needed)
+-- Allow public uploads (no authentication required for Phase 1)
 DROP POLICY IF EXISTS "Allow uploads" ON storage.objects;
-CREATE POLICY "Allow uploads"
+DROP POLICY IF EXISTS "Public upload access" ON storage.objects;
+CREATE POLICY "Public upload access"
 ON storage.objects FOR INSERT
-TO authenticated
 WITH CHECK (bucket_id = 'resumes');
 
--- Allow anyone to upload (use this if you want public uploads)
--- DROP POLICY IF EXISTS "Allow public uploads" ON storage.objects;
--- CREATE POLICY "Allow public uploads"
--- ON storage.objects FOR INSERT
--- WITH CHECK (bucket_id = 'resumes');
-
--- Allow users to delete files
+-- Allow public delete
 DROP POLICY IF EXISTS "Allow delete" ON storage.objects;
-CREATE POLICY "Allow delete"
+DROP POLICY IF EXISTS "Public delete access" ON storage.objects;
+CREATE POLICY "Public delete access"
 ON storage.objects FOR DELETE
-TO authenticated
 USING (bucket_id = 'resumes');
+
+-- Allow public update
+DROP POLICY IF EXISTS "Public update access" ON storage.objects;
+CREATE POLICY "Public update access"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'resumes')
+WITH CHECK (bucket_id = 'resumes');

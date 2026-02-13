@@ -3,30 +3,22 @@
 import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { uploadResumesAndCreateCandidates } from "@/app/actions/bulk-upload-resumes";
+import { Upload, FileText, X, Loader2 } from "lucide-react";
+import { useUpload } from "@/context/UploadContext";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 interface FileWithPreview extends File {
   preview?: string;
 }
 
-interface UploadResult {
-  fileName: string;
-  success: boolean;
-  candidateName?: string;
-  message?: string;
-}
-
 export function BulkUploadZone() {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const { startUpload, isUploading } = useUpload();
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,69 +74,22 @@ export function BulkUploadZone() {
   const handleUpload = async () => {
     if (files.length === 0) return;
 
-    setIsUploading(true);
-    setProgress(0);
-    setUploadResults([]);
+    // Start the upload using context (continues in background)
+    await startUpload(files);
 
-    try {
-      // Create FormData with all files
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append("files", file);
-      });
+    // Show success message and navigate to candidates page
+    toast({
+      title: "Upload started!",
+      description: `Processing ${files.length} resume${files.length !== 1 ? 's' : ''}. You can navigate to other pages while upload continues.`,
+    });
 
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 500);
+    // Clear local file state
+    setFiles([]);
 
-      // Upload all files
-      const results = await uploadResumesAndCreateCandidates(formData);
-
-      clearInterval(progressInterval);
-      setProgress(100);
-      setUploadResults(results);
-
-      const successCount = results.filter((r) => r.success).length;
-      const errorCount = results.filter((r) => !r.success).length;
-
-      if (successCount > 0) {
-        toast({
-          title: "Upload complete!",
-          description: `Successfully uploaded ${successCount} resume${successCount !== 1 ? 's' : ''}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
-        });
-      }
-
-      if (errorCount === results.length) {
-        toast({
-          title: "Upload failed",
-          description: "All uploads failed. Please try again.",
-          variant: "destructive",
-        });
-      }
-
-      // Clear files after successful upload
-      if (successCount > 0) {
-        setTimeout(() => {
-          setFiles([]);
-          setUploadResults([]);
-        }, 5000);
-      }
-    } catch (error) {
-      toast({
-        title: "Upload error",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
+    // Navigate to candidates page to see results
+    setTimeout(() => {
+      router.push("/candidates");
+    }, 1500);
   };
 
   return (
@@ -265,60 +210,6 @@ export function BulkUploadZone() {
                   </>
                 )}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upload Progress */}
-      {isUploading && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-primary">
-                  Uploading resumes...
-                </span>
-                <span className="text-sm text-text-muted">{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upload Results */}
-      {uploadResults.length > 0 && !isUploading && (
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="font-semibold text-primary mb-4">Upload Results</h3>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {uploadResults.map((result, index) => (
-                <div
-                  key={index}
-                  className={`flex items-start gap-3 p-3 rounded-lg border ${
-                    result.success
-                      ? "bg-success/5 border-success/20"
-                      : "bg-danger/5 border-danger/20"
-                  }`}
-                >
-                  {result.success ? (
-                    <CheckCircle2 className="h-5 w-5 text-success shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-danger shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-primary truncate">
-                      {result.fileName}
-                    </p>
-                    <p className={`text-xs ${result.success ? "text-success" : "text-danger"}`}>
-                      {result.success
-                        ? `Created: ${result.candidateName}`
-                        : result.message || "Upload failed"}
-                    </p>
-                  </div>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>

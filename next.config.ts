@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false, // Catch all TypeScript errors during build
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "100mb", // Allow 50 resumes @ ~2MB each (increased from 50mb for safety)
+      allowedOrigins: ["localhost:3000", "127.0.0.1:3000"], // Allow localhost
+    },
+    proxyClientMaxBodySize: "100mb", // Allow large file uploads through proxy.ts
+  },
 };
 
 export default nextConfig;

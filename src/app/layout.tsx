@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { DM_Sans, Archivo } from "next/font/google";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/layout/ConditionalLayout";
+import { UploadProvider } from "@/context/UploadContext";
+import { FloatingUploadWidget } from "@/components/FloatingUploadWidget";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -32,7 +34,10 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${archivo.variable} antialiased`}
       >
-        <ConditionalLayout>{children}</ConditionalLayout>
+        <UploadProvider>
+          <ConditionalLayout>{children}</ConditionalLayout>
+          <FloatingUploadWidget />
+        </UploadProvider>
       </body>
     </html>
   );
