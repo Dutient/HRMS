@@ -21,7 +21,9 @@ import {
   Users,
   FileUp,
   Settings,
+  LogOut,
 } from "lucide-react";
+import { logout } from "@/app/actions/auth";
 
 interface HeaderProps {
   className?: string;
@@ -140,6 +142,19 @@ export function Header({ className }: HeaderProps) {
                   <Settings className="h-5 w-5" />
                   <span>Settings</span>
                 </Link>
+              </div>
+
+              {/* Logout */}
+              <div className="border-t border-primary-light pt-3 mt-3">
+                <form action={logout}>
+                  <button
+                    type="submit"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-primary-light hover:text-white transition-all"
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Logout</span>
+                  </button>
+                </form>
               </div>
             </nav>
           </SheetContent>
