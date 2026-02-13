@@ -8,7 +8,9 @@ import {
   Users,
   FileUp,
   Settings,
+  LogOut,
 } from "lucide-react";
+import { logout } from "@/app/actions/auth";
 
 interface SidebarProps {
   className?: string;
@@ -97,8 +99,8 @@ export function Sidebar({ className }: SidebarProps) {
         })}
       </nav>
 
-      {/* Settings at Bottom */}
-      <div className="border-t border-primary-light p-3">
+      {/* Settings & Logout at Bottom */}
+      <div className="border-t border-primary-light p-3 space-y-1">
         <Link
           href="/settings"
           className={cn(
@@ -111,6 +113,16 @@ export function Sidebar({ className }: SidebarProps) {
           <Settings className="h-5 w-5" />
           <span>Settings</span>
         </Link>
+        
+        <form action={logout}>
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-primary-light hover:text-white transition-all"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Logout</span>
+          </button>
+        </form>
       </div>
     </aside>
   );

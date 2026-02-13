@@ -143,7 +143,7 @@ async function rankWithAI(
     name: c.name,
     role: c.role,
     experience: c.experience,
-    skills: c.skills.join(", "),
+    skills: c.skills ? c.skills.join(", ") : "No skills listed",
     summary: c.summary,
   }));
 
