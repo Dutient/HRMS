@@ -10,7 +10,11 @@ async function loginAction(formData: FormData) {
   "use server";
   
   const password = formData.get("password") as string;
-  const appPassword = process.env.APP_PASSWORD || "admin123";
+  const appPassword = process.env.APP_PASSWORD;
+
+  if (!appPassword) {
+    throw new Error("APP_PASSWORD environment variable is not configured");
+  }
 
   if (password === appPassword) {
     // Set secure HTTP-only cookie
@@ -76,9 +80,9 @@ export default async function LoginPage({
           </form>
           <div className="mt-6 pt-6 border-t border-border">
             <p className="text-xs text-center text-text-muted">
-              Default password: <code className="bg-background px-2 py-1 rounded">admin123</code>
+              For demo purposes, use the configured application password
               <br />
-              <span className="text-xs">Configure via APP_PASSWORD environment variable</span>
+              <span className="text-xs">Set via APP_PASSWORD environment variable</span>
             </p>
           </div>
         </CardContent>
