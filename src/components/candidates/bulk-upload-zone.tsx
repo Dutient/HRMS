@@ -4,10 +4,12 @@ import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X, Loader2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, Briefcase, Hash, Globe } from "lucide-react";
 import { useUpload } from "@/context/UploadContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -19,6 +21,11 @@ export function BulkUploadZone() {
   const { startUpload, isUploading } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
+
+  // Metadata state
+  const [position, setPosition] = useState("");
+  const [jobOpening, setJobOpening] = useState("");
+  const [domain, setDomain] = useState("");
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -32,7 +39,7 @@ export function BulkUploadZone() {
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const droppedFiles = Array.from(e.dataTransfer.files).filter(
       (file) => file.type === "application/pdf"
     );
@@ -75,7 +82,11 @@ export function BulkUploadZone() {
     if (files.length === 0) return;
 
     // Start the upload using context (continues in background)
-    await startUpload(files);
+    await startUpload(files, {
+      position: position || undefined,
+      job_opening: jobOpening || undefined,
+      domain: domain || undefined,
+    });
 
     // Show success message and navigate to candidates page
     toast({
@@ -96,7 +107,55 @@ export function BulkUploadZone() {
     <div className="space-y-6">
       {/* Drop Zone */}
       <Card>
-        <CardContent className="p-12">
+        <CardContent className="p-8 space-y-6">
+          {/* Metadata Inputs */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="position" className="text-sm font-medium">Position</Label>
+              <div className="relative">
+                <Briefcase className="absolute left-2.5 top-2.5 h-4 w-4 text-text-muted" />
+                <Input
+                  id="position"
+                  placeholder="e.g. Frontend Dev"
+                  className="pl-9"
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                  disabled={isUploading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="job-opening" className="text-sm font-medium">Job Opening ID</Label>
+              <div className="relative">
+                <Hash className="absolute left-2.5 top-2.5 h-4 w-4 text-text-muted" />
+                <Input
+                  id="job-opening"
+                  placeholder="e.g. JOB-123"
+                  className="pl-9"
+                  value={jobOpening}
+                  onChange={(e) => setJobOpening(e.target.value)}
+                  disabled={isUploading}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="domain" className="text-sm font-medium">Domain</Label>
+              <div className="relative">
+                <Globe className="absolute left-2.5 top-2.5 h-4 w-4 text-text-muted" />
+                <Input
+                  id="domain"
+                  placeholder="e.g. Engineering"
+                  className="pl-9"
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  disabled={isUploading}
+                />
+              </div>
+            </div>
+          </div>
+
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -116,13 +175,13 @@ export function BulkUploadZone() {
               className="hidden"
               disabled={isUploading}
             />
-            
+
             <Upload className="mx-auto h-16 w-16 text-text-muted mb-4" />
-            
+
             <h3 className="font-heading text-xl font-semibold text-primary mb-2">
               {isUploading ? "Uploading resumes..." : "Drop PDF files here or click to browse"}
             </h3>
-            
+
             <p className="text-text-muted mb-6">
               Maximum 50 files • PDF format only
             </p>

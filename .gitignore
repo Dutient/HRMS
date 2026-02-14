@@ -52,3 +52,5 @@ docs/Dutient HRMS - PRD.pdf
 # Supabase
 supabase/.temp/
 docs/*.pdf
+
+*.png

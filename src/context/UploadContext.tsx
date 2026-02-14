@@ -16,7 +16,7 @@ interface UploadContextType {
   uploadedCount: number;
   totalCount: number;
   filesQueue: FileStatus[];
-  startUpload: (files: File[]) => Promise<void>;
+  startUpload: (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => Promise<void>;
   clearQueue: () => void;
 }
 
@@ -37,7 +37,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     }
   }, [isUploading]);
 
-  const startUpload = useCallback(async (files: File[]) => {
+  const startUpload = useCallback(async (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => {
     // Validate file count
     if (files.length > 50) {
       alert("Maximum 50 files allowed per upload");
@@ -65,7 +65,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
     try {
       // Call bulk upload action
-      const results = await uploadResumesAndCreateCandidates(formData);
+      const results = await uploadResumesAndCreateCandidates(formData, metadata);
 
       // Update queue with results
       const updatedQueue = results.map((result) => ({

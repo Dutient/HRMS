@@ -21,7 +21,7 @@ interface ExtractedData {
 /**
  * Extract text from PDF file
  */
-async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     // @ts-expect-error - pdf-parse is a CommonJS module
     const pdfParseModule = await import("pdf-parse/lib/pdf-parse.js");
@@ -57,7 +57,7 @@ function extractTextFromTXT(buffer: Buffer): string {
 /**
  * Use Gemini AI to extract structured data from resume text
  */
-async function extractDataWithGemini(
+export async function extractDataWithGemini(
   resumeText: string
 ): Promise<ExtractedData> {
   const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
@@ -142,7 +142,7 @@ export async function processResume(formData: FormData): Promise<{
         message: "No file provided",
       };
     }
-    
+
     console.log(`📄 Processing file: ${file.name} (${file.type}, ${file.size} bytes)`);
 
     // Validate file type
@@ -191,7 +191,7 @@ export async function processResume(formData: FormData): Promise<{
     }
 
     console.log(`✅ Extracted ${resumeText.length} characters of text`);
-    
+
     // Check if text was extracted
     if (!resumeText || resumeText.trim().length < 50) {
       console.error(`❌ Not enough text extracted (${resumeText?.length || 0} chars)`);
@@ -246,7 +246,7 @@ export async function processResume(formData: FormData): Promise<{
         message: `Database error: ${error.message}`,
       };
     }
-    
+
     console.log(`✅ Successfully added candidate: ${extractedData.name}`);
 
     // Revalidate the candidates page to show new data
