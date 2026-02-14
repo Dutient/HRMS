@@ -6,7 +6,14 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
  * Create a new ranking job in the database
  * This job will be processed by the Supabase Edge Function
  */
-export async function createRankingJob(jdText: string): Promise<{
+export async function createRankingJob(
+  jdText: string,
+  filters?: {
+    position?: string;
+    job_opening?: string;
+    domain?: string;
+  }
+): Promise<{
   success: boolean;
   message: string;
   jobId?: string;
@@ -36,6 +43,7 @@ export async function createRankingJob(jdText: string): Promise<{
       .insert({
         job_description: jdText,
         status: "queued",
+        filters: filters || null, // Store filters in the job record
       })
       .select()
       .single();
@@ -66,13 +74,14 @@ export async function createRankingJob(jdText: string): Promise<{
         body: JSON.stringify({
           jobId: job.id,
           jobDescription: jdText,
+          filters: filters || null, // Pass filters to Edge Function
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("❌ Edge Function error:", errorText);
-        
+
         // Update job status to failed
         await supabase
           .from("ranking_jobs")
@@ -97,7 +106,7 @@ export async function createRankingJob(jdText: string): Promise<{
       };
     } catch (fetchError) {
       console.error("❌ Error triggering Edge Function:", fetchError);
-      
+
       // Update job status to failed
       await supabase
         .from("ranking_jobs")

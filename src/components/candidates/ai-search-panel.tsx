@@ -12,9 +12,14 @@ import { parseJobDescription } from "@/app/actions/parse-jd";
 
 interface AISearchPanelProps {
   onRankingComplete?: () => void;
+  filters?: {
+    position?: string;
+    job_opening?: string;
+    domain?: string;
+  };
 }
 
-export function AISearchPanel({ onRankingComplete }: AISearchPanelProps = {}) {
+export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps = {}) {
   const [jdText, setJdText] = useState("");
   const [isRanking, setIsRanking] = useState(false);
   const [result, setResult] = useState<{
@@ -102,7 +107,7 @@ export function AISearchPanel({ onRankingComplete }: AISearchPanelProps = {}) {
     setProgress(null);
 
     try {
-      const response = await createRankingJob(jdText);
+      const response = await createRankingJob(jdText, filters);
 
       if (response.success && response.jobId) {
         setCurrentJobId(response.jobId);
@@ -253,10 +258,9 @@ export function AISearchPanel({ onRankingComplete }: AISearchPanelProps = {}) {
             <div
               className={`
                 p-3 rounded-lg border flex items-start gap-2
-                ${
-                  result.type === "success"
-                    ? "bg-success/5 border-success/20"
-                    : "bg-danger/5 border-danger/20"
+                ${result.type === "success"
+                  ? "bg-success/5 border-success/20"
+                  : "bg-danger/5 border-danger/20"
                 }
               `}
             >
@@ -266,9 +270,8 @@ export function AISearchPanel({ onRankingComplete }: AISearchPanelProps = {}) {
                 <AlertCircle className="h-5 w-5 text-danger shrink-0 mt-0.5" />
               )}
               <p
-                className={`text-sm ${
-                  result.type === "success" ? "text-success" : "text-danger"
-                }`}
+                className={`text-sm ${result.type === "success" ? "text-success" : "text-danger"
+                  }`}
               >
                 {result.message}
               </p>

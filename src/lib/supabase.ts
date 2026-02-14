@@ -51,6 +51,10 @@ export interface Candidate {
   summary: string | null;
   resume_url: string | null;
   availability: string | null;
+  // New metadata fields
+  position?: string | null;
+  job_opening?: string | null;
+  domain?: string | null;
   rating: number | null;
   last_engaged: string | null;
   updated_at: string;

@@ -5,10 +5,16 @@ import { supabase, isSupabaseConfigured, type Candidate } from "@/lib/supabase";
 /**
  * Fetch all candidates from the database
  * @param status - Optional status filter
+ * @param filters - Optional metadata filters
  * @returns Array of candidates
  */
 export async function getCandidates(
-  status?: Candidate["status"]
+  status?: Candidate["status"],
+  filters?: {
+    position?: string;
+    job_opening?: string;
+    domain?: string;
+  }
 ): Promise<Candidate[]> {
   // Return empty array if Supabase is not configured
   if (!isSupabaseConfigured || !supabase) {
@@ -27,6 +33,17 @@ export async function getCandidates(
     // Apply status filter if provided
     if (status) {
       query = query.eq("status", status);
+    }
+
+    // Apply metadata filters if provided
+    if (filters?.position) {
+      query = query.ilike("position", `%${filters.position}%`);
+    }
+    if (filters?.job_opening) {
+      query = query.eq("job_opening", filters.job_opening);
+    }
+    if (filters?.domain) {
+      query = query.ilike("domain", `%${filters.domain}%`);
     }
 
     const { data, error } = await query;
@@ -114,6 +131,7 @@ export async function getCandidateById(
 export async function searchCandidates(
   searchQuery: string
 ): Promise<Candidate[]> {
+  // ... existing implementation ...
   // Return empty array if Supabase is not configured
   if (!isSupabaseConfigured || !supabase) {
     console.warn("Supabase not configured. Please add your credentials to .env.local");
@@ -142,5 +160,35 @@ export async function searchCandidates(
   } catch (error) {
     console.error("Error in searchCandidates:", error);
     return [];
+  }
+}
+
+/**
+ * Get unique values for filters
+ */
+export async function getFilterOptions() {
+  if (!isSupabaseConfigured || !supabase) {
+    return { positions: [], jobOpenings: [], domains: [] };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("candidates")
+      .select("position, job_opening, domain");
+
+    if (error) throw error;
+
+    const positions = Array.from(new Set(data?.map(c => c.position).filter(Boolean))) as string[];
+    const jobOpenings = Array.from(new Set(data?.map(c => c.job_opening).filter(Boolean))) as string[];
+    const domains = Array.from(new Set(data?.map(c => c.domain).filter(Boolean))) as string[];
+
+    return {
+      positions: positions.sort(),
+      jobOpenings: jobOpenings.sort(),
+      domains: domains.sort(),
+    };
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    return { positions: [], jobOpenings: [], domains: [] };
   }
 }

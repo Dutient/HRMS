@@ -16,6 +16,9 @@ interface CandidateForRanking {
   summary: string;
   experience: number;
   role: string;
+  position?: string;
+  job_opening?: string;
+  domain?: string;
 }
 
 interface RankingResult {
@@ -24,210 +27,18 @@ interface RankingResult {
   reasoning: string;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      }
-    })
-  }
+// ------------------------------------------------------------------
+// Helper: Delay
+// ------------------------------------------------------------------
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
-  let jobId: string | null = null;
-
-  try {
-    const body = await req.json()
-    jobId = body.jobId
-    const jobDescription = body.jobDescription
-
-    if (!jobId || !jobDescription) {
-      throw new Error('Missing jobId or jobDescription')
-    }
-
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY not configured')
-    }
-
-    console.log(`🎯 Starting ranking job ${jobId}`)
-
-    // Initialize Supabase client
-    const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!)
-
-    // Update job status to processing
-    await supabase
-      .from('ranking_jobs')
-      .update({
-        status: 'processing',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', jobId)
-
-    // Fetch all candidates
-    console.log('📊 Fetching candidates from database...')
-    const { data: candidates, error: fetchError } = await supabase
-      .from('candidates')
-      .select('id, name, skills, summary, experience, role')
-      .order('created_at', { ascending: false })
-
-    if (fetchError) {
-      throw new Error(`Database error: ${fetchError.message}`)
-    }
-
-    if (!candidates || candidates.length === 0) {
-      throw new Error('No candidates found to rank')
-    }
-
-    console.log(`✅ Found ${candidates.length} candidates to rank`)
-
-    // Update total count
-    await supabase
-      .from('ranking_jobs')
-      .update({ total_candidates: candidates.length })
-      .eq('id', jobId)
-
-    // Process candidates in batches of 5 for better reliability (reduced from 10)
-    const BATCH_SIZE = 5
-    const batches = []
-    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
-      batches.push(candidates.slice(i, i + BATCH_SIZE))
-    }
-
-    console.log(`🤖 Processing ${batches.length} batches...`)
-
-    let processedCount = 0
-    const allRankings: RankingResult[] = []
-
-    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-      const batch = batches[batchIndex]
-      console.log(`Processing batch ${batchIndex + 1}/${batches.length}`)
-
-      try {
-        // Rank this batch with Gemini
-        const rankings = await rankBatchWithGemini(jobDescription, batch)
-        allRankings.push(...rankings)
-
-        // Update Supabase with scores
-        for (const ranking of rankings) {
-          await supabase
-            .from('candidates')
-            .update({ match_score: ranking.match_score })
-            .eq('id', ranking.id)
-        }
-
-        processedCount += batch.length
-
-        // Update progress
-        await supabase
-          .from('ranking_jobs')
-          .update({ processed_candidates: processedCount })
-          .eq('id', jobId)
-
-        console.log(`✅ Processed ${processedCount}/${candidates.length} candidates`)
-
-        // Small delay to avoid rate limits (Gemini free tier: 15 RPM)
-        await new Promise(resolve => setTimeout(resolve, 5000)) // 5 seconds for safety
-
-      } catch (error) {
-        console.error(`❌ Error processing batch ${batchIndex + 1}:`, error)
-        
-        // Give failed candidates a default score of 0 so they don't appear blank
-        console.log(`⚠️ Setting default score of 0 for ${batch.length} candidates in failed batch`)
-        for (const candidate of batch) {
-          try {
-            await supabase
-              .from('candidates')
-              .update({ match_score: 0 })
-              .eq('id', candidate.id)
-            console.log(`  - Set score 0 for candidate ${candidate.id}`)
-          } catch (updateError) {
-            console.error(`  - Failed to set default score for ${candidate.id}:`, updateError)
-          }
-        }
-        
-        // Continue with next batch even if one fails
-        processedCount += batch.length
-        await supabase
-          .from('ranking_jobs')
-          .update({ processed_candidates: processedCount })
-          .eq('id', jobId)
-      }
-    }
-
-    // Mark job as completed
-    await supabase
-      .from('ranking_jobs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        processed_candidates: candidates.length
-      })
-      .eq('id', jobId)
-
-    console.log(`✅ Job ${jobId} completed successfully`)
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Successfully ranked ${allRankings.length} candidates`,
-        jobId
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      },
-    )
-
-  } catch (error) {
-    console.error('❌ Fatal error:', error)
-
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-
-    // Try to update job status to failed if we have a jobId
-    if (jobId) {
-      try {
-        const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!)
-        await supabase
-          .from('ranking_jobs')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', jobId)
-      } catch (updateError) {
-        console.error('Failed to update job status:', updateError)
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: errorMessage
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      },
-    )
-  }
-})
-
-/**
- * Rank a batch of candidates using Gemini AI
- */
+// ------------------------------------------------------------------
+// Helper: Rank a batch with Gemini (Single Attempt)
+// ------------------------------------------------------------------
 async function rankBatchWithGemini(
   jdText: string,
   candidates: CandidateForRanking[]
 ): Promise<RankingResult[]> {
-  
   const candidatesInfo = candidates.map((c) => ({
     id: c.id,
     name: c.name,
@@ -235,9 +46,11 @@ async function rankBatchWithGemini(
     experience: c.experience,
     skills: c.skills ? c.skills.join(", ") : "No skills listed",
     summary: c.summary,
+    position: c.position,
+    matches_job: c.job_opening ? `Applied for ${c.job_opening}` : undefined,
   }))
 
-  const prompt = `You are an expert technical recruiter. Compare the following candidates against the provided Job Description (JD). 
+  const prompt = `You are an expert technical recruiter. Compare the following candidates against the provided Job Description (JD).
 
 Job Description:
 ${jdText}
@@ -265,38 +78,34 @@ Return ONLY a valid JSON array with this exact structure:
   }
 ]
 
-CRITICAL: Return ONLY the JSON array, no additional text, no markdown formatting.`
+CRITICAL: Return ONLY the JSON array, no additional text, no markdown formatting.`;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        })
-      }
-    )
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      })
+    })
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`)
+      // If 429, throw specific error to be caught by retry logic
+      if (response.status === 429) {
+        throw new Error(`429 Too Many Requests`);
+      }
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json()
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text
 
-    if (!text) {
-      throw new Error('No response from Gemini API')
-    }
+    if (!text) throw new Error('No response from Gemini API')
 
-    // Clean up the response
+    // Clean up response
     let jsonText = text.trim()
     if (jsonText.startsWith("```json")) {
       jsonText = jsonText.replace(/```json\n?/g, "").replace(/```\n?/g, "")
@@ -305,32 +114,154 @@ CRITICAL: Return ONLY the JSON array, no additional text, no markdown formatting
     }
 
     const rankings = JSON.parse(jsonText) as RankingResult[]
+    if (!Array.isArray(rankings)) throw new Error("AI response is not an array")
 
-    if (!Array.isArray(rankings)) {
-      throw new Error("AI response is not an array")
-    }
-
-    // Ensure all candidates have a score
-    const rankedIds = new Set(rankings.map((r) => r.id))
-    const missingCandidates = candidates.filter((c) => !rankedIds.has(c.id))
-
-    for (const candidate of missingCandidates) {
-      rankings.push({
-        id: candidate.id,
-        match_score: 0,
-        reasoning: "Unable to rank this candidate",
-      })
-    }
-
-    // Clamp scores between 0-100
-    return rankings.map((r) => ({
-      ...r,
-      match_score: Math.max(0, Math.min(100, r.match_score)),
-    }))
-
+    return rankings
   } catch (error) {
     console.error("❌ Error in Gemini API call:", error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    throw new Error(`Failed to rank candidates: ${errorMessage}`)
+    throw error;
   }
 }
+
+// ------------------------------------------------------------------
+// Helper: Retry with Exponential Backoff
+// ------------------------------------------------------------------
+async function retryRankBatchWithGemini(
+  jdText: string,
+  candidates: CandidateForRanking[],
+  maxRetries = 3
+): Promise<RankingResult[]> {
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    try {
+      return await rankBatchWithGemini(jdText, candidates);
+    } catch (error: any) {
+      const is429 = error.message.includes("429");
+
+      if (is429 && attempt < maxRetries) {
+        attempt++;
+        const waitTime = 5000 * Math.pow(2, attempt - 1); // 5s, 10s, 20s
+        console.warn(`⚠️ Gemini 429 (Attempt ${attempt}/${maxRetries}). Waiting ${waitTime / 1000}s...`);
+        await delay(waitTime);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("Exceeded max retries");
+}
+
+// ------------------------------------------------------------------
+// Main Entry Point
+// ------------------------------------------------------------------
+serve(async (req) => {
+  // CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      }
+    })
+  }
+
+  let jobId: string | null = null;
+  const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!)
+
+  try {
+    const { jobId: id, jobDescription, filters } = await req.json()
+    jobId = id
+
+    if (!jobId || !jobDescription) throw new Error('Missing jobId or jobDescription')
+    if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured')
+
+    console.log(`🎯 Starting ranking job ${jobId}`)
+
+    // Update status to processing
+    await supabase.from('ranking_jobs')
+      .update({ status: 'processing', started_at: new Date().toISOString() })
+      .eq('id', jobId)
+
+    // Build query with filters
+    console.log('📊 Fetching candidates...')
+    let query = supabase.from('candidates')
+      .select('id, name, skills, summary, experience, role, position, job_opening, domain')
+      .order('created_at', { ascending: false })
+
+    if (filters?.position) query = query.ilike('position', `%${filters.position}%`)
+    if (filters?.job_opening) query = query.eq('job_opening', filters.job_opening)
+    if (filters?.domain) query = query.ilike('domain', `%${filters.domain}%`)
+
+    const { data: candidates, error: fetchError } = await query
+
+    if (fetchError) throw new Error(`Database error: ${fetchError.message}`)
+    if (!candidates || candidates.length === 0) throw new Error('No candidates found to rank')
+
+    console.log(`✅ Found ${candidates.length} candidates to rank`)
+
+    await supabase.from('ranking_jobs').update({ total_candidates: candidates.length }).eq('id', jobId)
+
+    // Batching
+    const BATCH_SIZE = 5
+    const batches = []
+    for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
+      batches.push(candidates.slice(i, i + BATCH_SIZE))
+    }
+
+    console.log(`🤖 Processing ${batches.length} batches...`)
+    let processedCount = 0
+
+    // SEQUENTIAL LOOP
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(`Processing batch ${i + 1}/${batches.length}`);
+
+      try {
+        const rankings = await retryRankBatchWithGemini(jobDescription, batch);
+
+        // Update scores
+        for (const r of rankings) {
+          await supabase.from('candidates')
+            .update({ match_score: Math.max(0, Math.min(100, r.match_score)) })
+            .eq('id', r.id)
+        }
+      } catch (error) {
+        console.error(`❌ Failed batch ${i + 1}:`, error)
+        // Set 0 for failed batch
+        for (const c of batch) {
+          await supabase.from('candidates').update({ match_score: 0 }).eq('id', c.id)
+        }
+      }
+
+      processedCount += batch.length
+      await supabase.from('ranking_jobs').update({ processed_candidates: processedCount }).eq('id', jobId)
+
+      // Rate Limit Delay
+      if (i < batches.length - 1) {
+        console.log("⏳ Waiting 4s for rate limit...");
+        await delay(4000);
+      }
+    }
+
+    // Complete
+    await supabase.from('ranking_jobs')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', jobId)
+
+    return new Response(JSON.stringify({ success: true, message: 'Ranking completed' }), {
+      headers: { 'Content-Type': 'application/json' }
+    })
+
+  } catch (error: any) {
+    console.error(`❌ Fatal error:`, error)
+    if (jobId) {
+      await supabase.from('ranking_jobs')
+        .update({ status: 'failed', error_message: error.message })
+        .eq('id', jobId)
+    }
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
+      status: 500, headers: { 'Content-Type': 'application/json' }
+    })
+  }
+})

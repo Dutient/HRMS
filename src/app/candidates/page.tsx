@@ -1,14 +1,29 @@
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
-import { getCandidates } from "@/app/actions/get-candidates";
+import { getCandidates, getFilterOptions } from "@/app/actions/get-candidates";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { SupabaseSetupBanner } from "@/components/candidates/supabase-setup-banner";
 import { AISearchPanel } from "@/components/candidates/ai-search-panel";
 import { CandidatesListClient } from "@/components/candidates/candidates-list-client";
 
-export default async function CandidatesPage() {
-  // Fetch all candidates from Supabase
-  const allCandidates = await getCandidates();
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function CandidatesPage({ searchParams }: Props) {
+  const params = await searchParams;
+
+  const filters = {
+    position: typeof params.position === 'string' ? params.position : undefined,
+    job_opening: typeof params.job_opening === 'string' ? params.job_opening : undefined,
+    domain: typeof params.domain === 'string' ? params.domain : undefined,
+  };
+
+  // Fetch all candidates from Supabase with filters
+  const allCandidates = await getCandidates(undefined, filters);
+
+  // Fetch filter options
+  const filterOptions = await getFilterOptions();
 
   return (
     <div className="space-y-6">
@@ -32,10 +47,14 @@ export default async function CandidatesPage() {
       </div>
 
       {/* AI Smart Search & Ranking */}
-      <AISearchPanel />
+      <AISearchPanel filters={filters} />
 
       {/* Search Bar & Candidates Grid (Client Component) */}
-      <CandidatesListClient candidates={allCandidates} />
+      <CandidatesListClient
+        candidates={allCandidates}
+        filters={filters}
+        options={filterOptions}
+      />
     </div>
   );
 }
