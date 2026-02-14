@@ -1,13 +1,10 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Users, Search, Filter } from "lucide-react";
+import { Users } from "lucide-react";
 import { getCandidates } from "@/app/actions/get-candidates";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { CandidatesGrid } from "@/components/candidates/candidates-grid";
 import { SupabaseSetupBanner } from "@/components/candidates/supabase-setup-banner";
 import { AISearchPanel } from "@/components/candidates/ai-search-panel";
+import { CandidatesListClient } from "@/components/candidates/candidates-list-client";
 
 export default async function CandidatesPage() {
   // Fetch all candidates from Supabase
@@ -37,27 +34,8 @@ export default async function CandidatesPage() {
       {/* AI Smart Search & Ranking */}
       <AISearchPanel />
 
-      {/* Search & Filter Bar */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-              <Input
-                placeholder="Search by name, role, or skills..."
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Candidates Grid */}
-      <CandidatesGrid candidates={allCandidates} />
+      {/* Search Bar & Candidates Grid (Client Component) */}
+      <CandidatesListClient candidates={allCandidates} />
     </div>
   );
 }
