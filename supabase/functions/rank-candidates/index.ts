@@ -88,8 +88,8 @@ serve(async (req) => {
       .update({ total_candidates: candidates.length })
       .eq('id', jobId)
 
-    // Process candidates in batches of 10 for better AI accuracy
-    const BATCH_SIZE = 10
+    // Process candidates in batches of 5 for better reliability (reduced from 10)
+    const BATCH_SIZE = 5
     const batches = []
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
       batches.push(candidates.slice(i, i + BATCH_SIZE))
@@ -128,10 +128,25 @@ serve(async (req) => {
         console.log(`✅ Processed ${processedCount}/${candidates.length} candidates`)
 
         // Small delay to avoid rate limits (Gemini free tier: 15 RPM)
-        await new Promise(resolve => setTimeout(resolve, 4000))
+        await new Promise(resolve => setTimeout(resolve, 5000)) // 5 seconds for safety
 
       } catch (error) {
         console.error(`❌ Error processing batch ${batchIndex + 1}:`, error)
+        
+        // Give failed candidates a default score of 0 so they don't appear blank
+        console.log(`⚠️ Setting default score of 0 for ${batch.length} candidates in failed batch`)
+        for (const candidate of batch) {
+          try {
+            await supabase
+              .from('candidates')
+              .update({ match_score: 0 })
+              .eq('id', candidate.id)
+            console.log(`  - Set score 0 for candidate ${candidate.id}`)
+          } catch (updateError) {
+            console.error(`  - Failed to set default score for ${candidate.id}:`, updateError)
+          }
+        }
+        
         // Continue with next batch even if one fails
         processedCount += batch.length
         await supabase
