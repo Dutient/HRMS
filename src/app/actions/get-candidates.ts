@@ -20,6 +20,8 @@ export async function getCandidates(
     let query = supabase
       .from("candidates")
       .select("*")
+      // Order by match_score descending, nulls last, then by created_at
+      .order("match_score", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
 
     // Apply status filter if provided
