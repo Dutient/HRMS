@@ -46,19 +46,18 @@ const formatDate = (dateString: string) => {
 };
 
 const getMatchScoreBadge = (score: number | null) => {
-  if (!score) return null;
-
+  // Always show badge, even for 0 or null
   let colorClass = "bg-danger/10 text-danger"; // < 60
-  if (score >= 80) {
+  if (score !== null && score >= 80) {
     colorClass = "bg-success/10 text-success"; // >= 80
-  } else if (score >= 60) {
+  } else if (score !== null && score >= 60) {
     colorClass = "bg-warning/10 text-warning"; // >= 60
   }
-
+  const displayScore = score === null ? 0 : score;
   return (
     <Badge className={colorClass}>
       <Star className="h-3 w-3 mr-1 fill-current" />
-      {score}% Match
+      {displayScore}% Match
     </Badge>
   );
 };
@@ -76,13 +75,8 @@ export function CandidatesList({ candidates }: CandidatesListProps) {
         candidate.skills.some((skill) => skill.toLowerCase().includes(searchLower))
       );
     })
-    .sort((a, b) => {
-      // Sort by match_score descending (nulls last)
-      if (a.match_score === null && b.match_score === null) return 0;
-      if (a.match_score === null) return 1;
-      if (b.match_score === null) return -1;
-      return b.match_score - a.match_score;
-    });
+    // No need to sort here, already sorted from backend
+    ;
 
   return (
     <>
@@ -211,15 +205,13 @@ export function CandidatesList({ candidates }: CandidatesListProps) {
                           <span>Source: {candidate.source}</span>
                         </>
                       )}
-                      {candidate.match_score && (
-                        <>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Star className="h-3 w-3 fill-accent text-accent" />
-                            Match: {candidate.match_score}%
-                          </span>
-                        </>
-                      )}
+                      <>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-accent text-accent" />
+                          Match: {candidate.match_score === null ? 0 : candidate.match_score}%
+                        </span>
+                      </>
                     </div>
                   </div>
                 </div>
