@@ -192,3 +192,38 @@ export async function getFilterOptions() {
     return { positions: [], jobOpenings: [], domains: [] };
   }
 }
+
+/**
+ * Fetch candidates for ranking iteration (ID and Name only)
+ */
+export async function getCandidatesForRanking(
+  filters?: {
+    position?: string;
+    job_opening?: string;
+    domain?: string;
+  }
+): Promise<{ id: string; name: string }[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    return [];
+  }
+
+  try {
+    let query = supabase
+      .from("candidates")
+      .select("id, name")
+      .order("created_at", { ascending: false });
+
+    if (filters?.position) query = query.ilike("position", `%${filters.position}%`);
+    if (filters?.job_opening) query = query.eq("job_opening", filters.job_opening);
+    if (filters?.domain) query = query.ilike("domain", `%${filters.domain}%`);
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    return data || [];
+  } catch (error) {
+    console.error("Error fetching candidates for ranking:", error);
+    return [];
+  }
+}
