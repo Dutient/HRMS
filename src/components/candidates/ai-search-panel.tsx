@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { createRankingJob, getRankingJobStatus } from "@/app/actions/ranking-jobs";
 import { parseJobDescription } from "@/app/actions/parse-jd";
+import { getCandidatesForRanking } from "@/app/actions/get-candidates";
+import { rankSingleCandidate } from "@/app/actions/rank-candidates";
 
 interface AISearchPanelProps {
   onRankingComplete?: () => void;
@@ -26,72 +27,15 @@ export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+
   const [progress, setProgress] = useState<{
     total: number;
     processed: number;
     percentage: number;
+    currentName?: string;
   } | null>(null);
 
-  // Poll for job status
-  const pollJobStatus = useCallback(async (jobId: string) => {
-    try {
-      const response = await getRankingJobStatus(jobId);
-
-      if (!response.success || !response.job) {
-        setIsRanking(false);
-        setResult({
-          type: "error",
-          message: response.message || "Failed to get job status",
-        });
-        return;
-      }
-
-      const { status, total_candidates, processed_candidates, error_message } = response.job;
-
-      // Update progress
-      if (total_candidates > 0) {
-        setProgress({
-          total: total_candidates,
-          processed: processed_candidates,
-          percentage: Math.round((processed_candidates / total_candidates) * 100),
-        });
-      }
-
-      if (status === "completed") {
-        setIsRanking(false);
-        setCurrentJobId(null);
-        setProgress(null);
-        setResult({
-          type: "success",
-          message: `Successfully ranked ${total_candidates} candidates!`,
-        });
-        onRankingComplete?.();
-      } else if (status === "failed") {
-        setIsRanking(false);
-        setCurrentJobId(null);
-        setProgress(null);
-        setResult({
-          type: "error",
-          message: error_message || "Ranking failed. Please try again.",
-        });
-      }
-      // If processing or queued, continue polling
-    } catch (error) {
-      console.error("Error polling job status:", error);
-    }
-  }, [onRankingComplete]);
-
-  // Effect to poll job status
-  useEffect(() => {
-    if (!currentJobId) return;
-
-    const interval = setInterval(() => {
-      pollJobStatus(currentJobId);
-    }, 2000); // Poll every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [currentJobId, pollJobStatus]);
+  const abortRef = useRef(false);
 
   const handleRank = async () => {
     if (!jdText.trim()) {
@@ -105,30 +49,87 @@ export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps
     setIsRanking(true);
     setResult(null);
     setProgress(null);
+    abortRef.current = false;
 
     try {
-      const response = await createRankingJob(jdText, filters);
+      // 1. Fetch candidates to rank
+      const candidates = await getCandidatesForRanking(filters);
 
-      if (response.success && response.jobId) {
-        setCurrentJobId(response.jobId);
-        setResult({
-          type: "success",
-          message: "Ranking job started. This may take a few minutes for large batches...",
-        });
-        // Start polling
-        pollJobStatus(response.jobId);
-      } else {
+      if (candidates.length === 0) {
         setIsRanking(false);
         setResult({
           type: "error",
-          message: response.message,
+          message: "No candidates found matching the current filters.",
         });
+        return;
       }
-    } catch {
+
+      setProgress({
+        total: candidates.length,
+        processed: 0,
+        percentage: 0,
+        currentName: "Starting...",
+      });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // 2. Loop through candidates
+      for (let i = 0; i < candidates.length; i++) {
+        if (abortRef.current) break;
+
+        const candidate = candidates[i];
+
+        // Update progress
+        setProgress({
+          total: candidates.length,
+          processed: i + 1,
+          percentage: Math.round(((i) / candidates.length) * 100), // Show progress start of item
+          currentName: `Ranking ${candidate.name}...`,
+        });
+
+        try {
+          // Call Server Action
+          const response = await rankSingleCandidate(candidate.id, jdText);
+
+          if (response.success) {
+            successCount++;
+          } else {
+            console.error(`Failed to rank ${candidate.name}:`, response.message);
+            errorCount++;
+          }
+        } catch (err) {
+          console.error(`Unexpected error ranking ${candidate.name}:`, err);
+          errorCount++;
+        }
+
+        // Update percentage after completion
+        setProgress(prev => prev ? {
+          ...prev,
+          processed: i + 1,
+          percentage: Math.round(((i + 1) / candidates.length) * 100)
+        } : null);
+
+        // Rate Limiting Delay (4 seconds)
+        if (i < candidates.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 6500));
+        }
+      }
+
+      setIsRanking(false);
+      setProgress(null);
+      setResult({
+        type: "success",
+        message: `Ranking complete! ${successCount} ranked successfully${errorCount > 0 ? `, ${errorCount} failed` : ''}.`,
+      });
+      onRankingComplete?.();
+
+    } catch (error) {
+      console.error("Fatal error in ranking loop:", error);
       setIsRanking(false);
       setResult({
         type: "error",
-        message: "Failed to start ranking job. Please try again.",
+        message: "Failed to start ranking process. Please try again.",
       });
     }
   };
@@ -208,7 +209,7 @@ export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps
               {isRanking ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Ranking Candidates...
+                  {progress?.currentName || "Ranking Candidates..."}
                 </>
               ) : (
                 <>
@@ -245,7 +246,9 @@ export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps
           {progress && isRanking && (
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-text-muted">Processing candidates...</span>
+                <span className="text-text-muted">
+                  {progress.currentName || "Processing..."}
+                </span>
                 <span className="font-medium text-primary">
                   {progress.processed} / {progress.total} ({progress.percentage}%)
                 </span>
@@ -282,9 +285,8 @@ export function AISearchPanel({ onRankingComplete, filters }: AISearchPanelProps
             <p className="text-xs text-text-muted">
               <span className="font-semibold text-accent">💡 How it works:</span> AI
               analyzes each candidate&apos;s skills, experience, and summary against your job
-              requirements, assigning match scores from 0-100. Processing happens in the background
-              and can handle large batches (50+ resumes) without timeouts. Candidates will be
-              automatically sorted by relevance once complete.
+              requirements, assigning match scores from 0-100. Processing happens sequentially
+              to ensure high quality results. Candidates will be automatically sorted by relevance.
             </p>
           </div>
         </div>

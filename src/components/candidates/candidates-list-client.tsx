@@ -111,7 +111,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Position" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-black z-50">
                 <SelectItem value="all">All Positions</SelectItem>
                 {options?.positions && options.positions.length > 0 ? (
                   options.positions.map((p) => (
@@ -132,7 +132,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Job Opening" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-black z-50">
                 <SelectItem value="all">All Jobs</SelectItem>
                 {options?.jobOpenings && options.jobOpenings.length > 0 ? (
                   options.jobOpenings.map((j) => (
@@ -153,7 +153,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Domain" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white text-black z-50">
                 <SelectItem value="all">All Domains</SelectItem>
                 {options?.domains && options.domains.length > 0 ? (
                   options.domains.map((d) => (

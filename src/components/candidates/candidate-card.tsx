@@ -24,7 +24,7 @@ interface CandidateCardProps {
 }
 
 const getMatchScoreBadge = (score: number | null) => {
-  if (!score) return null;
+  if (score === null || score === undefined) return null;
 
   let colorClass = "bg-warning/10 text-warning border-warning/20"; // 70-89
   const icon = <Star className="h-3 w-3 mr-1 fill-current" />;
@@ -90,7 +90,7 @@ export function CandidateCard({
     const body = encodeURIComponent(
       `Dear ${candidate.name},\n\nWe are pleased to invite you for an interview for the ${candidate.role} position.\n\nPlease let us know your availability.\n\nBest regards,\nHR Team`
     );
-    
+
     const mailtoLink = `mailto:${candidate.email}?subject=${subject}&body=${body}`;
     window.location.href = mailtoLink;
   };
