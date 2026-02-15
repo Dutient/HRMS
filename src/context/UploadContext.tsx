@@ -57,40 +57,58 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setProgress(0);
     uploadAbortRef.current = false;
 
-    // Process all files at once using bulk upload
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append("files", file);
-    });
+    // Process files sequentially
+    for (let i = 0; i < files.length; i++) {
+      // Check if upload was aborted (optional future feature, but good practice)
+      if (uploadAbortRef.current) break;
 
-    try {
-      // Call bulk upload action
-      const results = await uploadResumesAndCreateCandidates(formData, metadata);
+      const file = files[i];
 
-      // Update queue with results
-      const updatedQueue = results.map((result) => ({
-        name: result.fileName,
-        status: result.success ? ("success" as const) : ("error" as const),
-        message: result.message,
-        candidateName: result.candidateName,
-      }));
+      // Update status to processing
+      setFilesQueue(prev => prev.map((item, index) =>
+        index === i ? { ...item, status: "processing" } : item
+      ));
 
-      setFilesQueue(updatedQueue);
-      setUploadedCount(results.length);
-      setProgress(100);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
 
-    } catch (error) {
-      // Handle unexpected errors
-      console.error("Upload error:", error);
-      const errorQueue = files.map((file) => ({
-        name: file.name,
-        status: "error" as const,
-        message: error instanceof Error ? error.message : "Unexpected error occurred",
-      }));
-      setFilesQueue(errorQueue);
-    } finally {
-      setIsUploading(false);
+        // Call server action for single file
+        const result = await uploadResumesAndCreateCandidates(formData, metadata);
+
+        // Update status based on result
+        setFilesQueue(prev => prev.map((item, index) =>
+          index === i ? {
+            ...item,
+            status: result.success ? "success" : "error",
+            message: result.message,
+            candidateName: result.candidateName
+          } : item
+        ));
+
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        setFilesQueue(prev => prev.map((item, index) =>
+          index === i ? {
+            ...item,
+            status: "error",
+            message: error instanceof Error ? error.message : "Unexpected error"
+          } : item
+        ));
+      }
+
+      // Update progress
+      const currentCount = i + 1;
+      setUploadedCount(currentCount);
+      setProgress(Math.round((currentCount / files.length) * 100));
+
+      // Rate limiting delay (3 seconds) - only if not the last file
+      if (i < files.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     }
+
+    setIsUploading(false);
   }, []);
 
   const clearQueue = useCallback(() => {
