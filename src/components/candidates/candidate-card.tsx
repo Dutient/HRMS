@@ -23,7 +23,15 @@ interface CandidateCardProps {
   candidate: Candidate;
 }
 
-const getMatchScoreBadge = (score: number | null) => {
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
+
+const getMatchScoreBadge = (score: number | null, justification?: string | null) => {
   if (score === null || score === undefined) return null;
 
   let colorClass = "bg-warning/10 text-warning border-warning/20"; // 70-89
@@ -35,12 +43,31 @@ const getMatchScoreBadge = (score: number | null) => {
     colorClass = "bg-gray-100 text-gray-600 border-gray-200"; // < 70
   }
 
-  return (
-    <Badge className={colorClass}>
+  const badge = (
+    <Badge className={`${colorClass} cursor-help flex items-center gap-1`}>
       {icon}
       {score}% Match
+      {justification && <Info className="h-3 w-3 ml-1 opacity-70" />}
     </Badge>
   );
+
+  if (justification) {
+    return (
+      <TooltipProvider>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            {badge}
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-sm bg-popover text-popover-foreground border-border p-3 shadow-md">
+            <p className="font-semibold mb-1">AI Analysis:</p>
+            <p>{justification}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return badge;
 };
 
 const getSourceIcon = (source: string | null) => {
@@ -119,7 +146,7 @@ export function CandidateCard({
                   {candidate.role}
                 </p>
               </div>
-              {getMatchScoreBadge(candidate.match_score)}
+              {getMatchScoreBadge(candidate.match_score, (candidate as any).ai_justification)}
             </div>
 
             {/* Source Badge */}
