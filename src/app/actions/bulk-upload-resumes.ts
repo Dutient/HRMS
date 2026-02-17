@@ -122,6 +122,36 @@ export async function uploadResumesAndCreateCandidates(
       };
     }
 
+    // Step D.1: Generate Vector Embedding using AWS Bedrock (Titan v1)
+    let vectorElement: number[] | null = null;
+    try {
+      const { BedrockEmbeddings } = await import("@langchain/aws");
+      const embeddings = new BedrockEmbeddings({
+        region: process.env.BEDROCK_AWS_REGION,
+        model: "amazon.titan-embed-text-v1", // Explicitly using v1 for 1536 dimensions
+        credentials: {
+          accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
+        },
+      });
+      console.log("🧠 Generating vector embedding...");
+      vectorElement = await embeddings.embedQuery(resumeText);
+      console.log("✅ Vector embedding generated");
+    } catch (err) {
+      console.error("❌ Embedding generation failed:", err);
+      // We continue without embedding, or fail? User request implies we MUST have it.
+      // But for bulk upload resilience, maybe we note it?
+      // For now, let's just log and continue, inserting null if the column allows (it might NOT).
+      // Actually, the previous 'ingestResume.ts' insertion succeded with vector.
+      // Let's assume we want to fail for this candidate if embedding fails, to ensure data consistency.
+      await supabase.storage.from("resumes").remove([uploadData.path]);
+      return {
+        fileName: file.name,
+        success: false,
+        message: "Embedding generation failed",
+      };
+    }
+
     // Step E: Insert candidate record with all fields
     const { data: candidateData, error: insertError } = await supabase
       .from("candidates")
@@ -129,13 +159,14 @@ export async function uploadResumesAndCreateCandidates(
         name: extractedData.name,
         email: extractedData.email,
         phone: extractedData.phone,
-        role: extractedData.role,
+        role: extractedData.role || "General Application", // Default per requirement
         experience: extractedData.experience,
         skills: extractedData.skills,
         summary: extractedData.summary,
         status: "New",
         source: "Bulk Upload",
         match_score: null,
+        embedding: vectorElement,
         applied_date: new Date().toISOString().split("T")[0],
         resume_url: resumeUrl,
         // Add metadata
