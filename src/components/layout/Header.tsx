@@ -14,7 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import {
-  Bell,
+
   Search,
   Menu,
   LayoutDashboard,
@@ -75,7 +75,7 @@ export function Header({ className }: HeaderProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-16 md:h-20 items-center justify-between border-b border-border bg-card px-4 md:px-8 shadow-sm",
+        "sticky top-0 z-30 flex h-14 md:h-16 items-center justify-between border-b border-border bg-card px-4 md:px-8 shadow-sm",
         className
       )}
     >
@@ -87,7 +87,7 @@ export function Header({ className }: HeaderProps) {
               <Menu className="h-6 w-6 text-text" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-64 bg-primary p-0">
+          <SheetContent side="left" className="w-52 bg-primary p-0">
             <SheetHeader className="border-b border-primary-light p-6">
               <SheetTitle className="text-left">
                 <Link
@@ -183,10 +183,7 @@ export function Header({ className }: HeaderProps) {
       {/* Right Section - Notifications & Profile */}
       <div className="flex items-center gap-2 md:gap-4">
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-text-muted" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger" />
-        </Button>
+
 
         {/* User Profile */}
         <div className="flex items-center gap-2 md:gap-3 rounded-lg border border-border px-2 md:px-3 py-1.5 md:py-2 transition-colors hover:bg-background">

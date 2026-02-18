@@ -18,6 +18,7 @@ interface UploadContextType {
   filesQueue: FileStatus[];
   startUpload: (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => Promise<void>;
   clearQueue: () => void;
+  cancelUpload: () => void;
 }
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
@@ -119,6 +120,18 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setIsUploading(false);
   }, []);
 
+  const cancelUpload = useCallback(() => {
+    uploadAbortRef.current = true;
+    setIsUploading(false);
+    setFilesQueue((prev) =>
+      prev.map((item) =>
+        item.status === "pending" || item.status === "processing"
+          ? { ...item, status: "error", message: "Upload cancelled by user" }
+          : item
+      )
+    );
+  }, []);
+
   return (
     <UploadContext.Provider
       value={{
@@ -129,6 +142,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         filesQueue,
         startUpload,
         clearQueue,
+        cancelUpload,
       }}
     >
       {children}

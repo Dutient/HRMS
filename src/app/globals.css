@@ -6,23 +6,23 @@
   --primary-light: #1E293B;
   --accent: #F59E0B;
   --accent-hover: #D97706;
-  
+
   /* Semantic Colors */
   --success: #10B981;
   --danger: #EF4444;
   --warning: #F59E0B;
   --info: #3B82F6;
-  
+
   /* Background & Surface */
   --background: #F8FAFC;
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
-  
+
   /* Text Colors */
   --text: #0F172A;
   --text-muted: #64748B;
-  
+
   /* Border & Divider */
   --border: #E2E8F0;
   --ring: #F59E0B;
@@ -38,22 +38,22 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-info: var(--info);
-  
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  
+
   --color-text: var(--text);
   --color-text-muted: var(--text-muted);
-  
+
   --color-border: var(--border);
   --color-ring: var(--ring);
-  
+
   /* Typography */
   --font-sans: var(--font-dm-sans);
   --font-heading: var(--font-archivo);
-  
+
   /* Spacing & Sizing */
   --radius-sm: 8px;
   --radius-md: 12px;

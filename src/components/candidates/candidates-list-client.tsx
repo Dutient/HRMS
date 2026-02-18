@@ -119,7 +119,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
     <>
       {/* Search & Filter Bar */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4 pb-4">
           <div className="flex gap-3 justify-between">
             <div className="relative flex-1 max-w-lg">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
@@ -147,7 +147,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
             </div>
           </div>
 
-          <div className="mt-6 border-t pt-4">
+          <div className="mt-3 border-t pt-3">
             <FilterBar
               filters={{
                 position: filters?.position,

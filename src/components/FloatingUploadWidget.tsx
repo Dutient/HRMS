@@ -4,20 +4,21 @@ import { useUpload } from "@/context/UploadContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Upload, 
-  CheckCircle2, 
-  XCircle, 
-  Loader2, 
-  X, 
-  ChevronDown, 
+import {
+  Upload,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  X,
+  ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Ban
 } from "lucide-react";
 import { useState } from "react";
 
 export function FloatingUploadWidget() {
-  const { isUploading, progress, uploadedCount, totalCount, filesQueue, clearQueue } = useUpload();
+  const { isUploading, progress, uploadedCount, totalCount, filesQueue, clearQueue, cancelUpload } = useUpload();
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Don't render if no upload is active and queue is empty
@@ -61,6 +62,17 @@ export function FloatingUploadWidget() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {isUploading && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-danger hover:text-danger hover:bg-danger/10"
+                onClick={cancelUpload}
+                title="Stop Upload"
+              >
+                <Ban className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -110,14 +122,13 @@ export function FloatingUploadWidget() {
                   key={index}
                   className={`
                     p-2 rounded-lg border text-sm transition-all
-                    ${
-                      file.status === "success"
-                        ? "bg-success/5 border-success/20"
-                        : file.status === "error"
+                    ${file.status === "success"
+                      ? "bg-success/5 border-success/20"
+                      : file.status === "error"
                         ? "bg-danger/5 border-danger/20"
                         : file.status === "processing"
-                        ? "bg-accent/5 border-accent/20"
-                        : "bg-gray-50 border-gray-200"
+                          ? "bg-accent/5 border-accent/20"
+                          : "bg-gray-50 border-gray-200"
                     }
                   `}
                 >
@@ -155,14 +166,13 @@ export function FloatingUploadWidget() {
                       variant="secondary"
                       className={`
                         shrink-0 text-xs h-5 px-2
-                        ${
-                          file.status === "success"
-                            ? "bg-success/10 text-success"
-                            : file.status === "error"
+                        ${file.status === "success"
+                          ? "bg-success/10 text-success"
+                          : file.status === "error"
                             ? "bg-danger/10 text-danger"
                             : file.status === "processing"
-                            ? "bg-accent/10 text-accent"
-                            : "bg-gray-100 text-gray-600"
+                              ? "bg-accent/10 text-accent"
+                              : "bg-gray-100 text-gray-600"
                         }
                       `}
                     >
