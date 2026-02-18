@@ -111,6 +111,9 @@ export async function uploadResumesAndCreateCandidates(
     let extractedData;
     try {
       extractedData = await extractDataWithBedrock(resumeText);
+      if (!extractedData) {
+        throw new Error("Missing required fields (Name or Email)");
+      }
     } catch (err) {
       console.error(`❌ Bedrock extraction failed:`, err);
       // Cleanup uploaded file
@@ -118,7 +121,7 @@ export async function uploadResumesAndCreateCandidates(
       return {
         fileName: file.name,
         success: false,
-        message: "Bedrock extraction failed",
+        message: err instanceof Error ? err.message : "Bedrock extraction failed",
       };
     }
 

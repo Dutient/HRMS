@@ -3,7 +3,7 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import mammoth from "mammoth";
-
+import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@aws-sdk/client-bedrock-runtime";
 
 interface ExtractedData {
   name: string;
@@ -34,7 +34,7 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 /**
  * Extract text from DOCX file
  */
-async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
+export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   try {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
@@ -52,8 +52,6 @@ function extractTextFromTXT(buffer: Buffer): string {
 }
 
 // Initialize Bedrock Client
-import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@aws-sdk/client-bedrock-runtime";
-
 const bedrock = new BedrockRuntimeClient({
   region: "us-east-1", // Hardcoded per requirement or use process.env.BEDROCK_AWS_REGION
   credentials: {
@@ -87,7 +85,7 @@ async function invokeBedrockWithBackoff(
  */
 export async function extractDataWithBedrock(
   resumeText: string
-): Promise<ExtractedData> {
+): Promise<ExtractedData | null> {
   const modelId = "us.anthropic.claude-haiku-4-5-20251001-v1:0"; // Use US inference profile for on-demand throughput
 
   const prompt = `You are an expert resume parser. Extract the following information from this resume and return ONLY a valid JSON object.
@@ -146,29 +144,25 @@ Do not include any text before or after the JSON.`;
       jsonText = jsonText.replace(/```\n?/g, "");
     }
 
+    // Sanitize Null Bytes (Postgres doesn't like them)
+    // Also strip other non-printable chars if needed, but \u0000 is the main culprit
+    // eslint-disable-next-line no-control-regex
+    jsonText = jsonText.replace(/\u0000/g, "");
+
     const parsedData = JSON.parse(jsonText);
 
     // Validate required fields
     if (!parsedData.name || !parsedData.email) {
-      throw new Error("Missing required fields (name, email) in extracted data");
+      console.warn("⚠️ Missing required fields (name, email) in extracted data, skipping.");
+      return null;
     }
 
     return parsedData as ExtractedData;
   } catch (error) {
     console.error("❌ Error extracting data with Bedrock:", error);
-    throw new Error("Failed to parse resume with AI (Bedrock)");
+    throw error; // Re-throw so processResume can handle it
   }
 }
-
-// Keep Gemini function for backward compatibility if needed, or remove.
-// For now, removing usages in this file but keeping the function commented out or replacing it.
-// The instruction said "Replace", so I will replace the export.
-// But I need to support `extractDataWithGemini` calls if any other file uses it?
-// `bulk-upload-resumes.ts` is the only consumer.
-// So I will just replace the function body or rename.
-// Let's replace `extractDataWithGemini` entirely with `extractDataWithBedrock` but keep the name if we want minimal refactor,
-// OR better, export `extractDataWithBedrock` and update the consumer. 
-// I will REPLACE the content of the `extractDataWithGemini` function block with `extractDataWithBedrock` code and rename it to `extractDataWithBedrock`.
 
 /**
  * Process a single resume file
@@ -268,6 +262,15 @@ export async function processResume(formData: FormData): Promise<{
     // Extract structured data using Bedrock
     console.log("🤖 Extracting data with Bedrock (Claude 4.5 Haiku)...");
     const extractedData = await extractDataWithBedrock(resumeText);
+
+    if (!extractedData) {
+      console.warn("⚠️ Extraction skipped due to missing required fields.");
+      return {
+        success: false,
+        message: "Skipped: Missing Name or Email in resume",
+      };
+    }
+
     console.log(`✅ Extracted data for: ${extractedData.name} (${extractedData.email})`);
 
     // Check if candidate already exists

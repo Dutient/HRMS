@@ -23,9 +23,9 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
         <Sidebar />
 
         {/* Main Content Area - Light Theme */}
-        <div className="flex flex-1 flex-col md:pl-64">
+        <div className="flex flex-1 flex-col md:pl-52">
           <Header />
-          <main className="flex-1 bg-background p-4 md:p-8">
+          <main className="flex-1 bg-background p-3 md:p-6">
             {children}
           </main>
         </div>

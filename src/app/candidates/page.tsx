@@ -26,17 +26,17 @@ export default async function CandidatesPage({ searchParams }: Props) {
   const filterOptions = await getFilterOptions();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Supabase Setup Warning */}
       {!isSupabaseConfigured && <SupabaseSetupBanner />}
 
       {/* Page Header */}
       <div className="flex items-center justify-between flex-col md:flex-row gap-4">
         <div>
-          <h1 className="font-heading text-4xl font-bold text-primary">
+          <h1 className="font-heading text-3xl font-bold text-primary">
             All Candidates
           </h1>
-          <p className="mt-2 text-text-muted">
+          <p className="mt-1 text-text-muted">
             Browse, search, and manage all candidate profiles
           </p>
         </div>

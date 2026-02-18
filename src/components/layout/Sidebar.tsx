@@ -61,12 +61,12 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen w-64 bg-primary border-r border-primary-light hidden md:flex md:flex-col",
+        "fixed left-0 top-0 z-40 h-screen w-52 bg-primary border-r border-primary-light hidden md:flex md:flex-col",
         className
       )}
     >
       {/* Logo */}
-      <div className="flex h-20 items-center border-b border-primary-light px-6">
+      <div className="flex h-16 items-center border-b border-primary-light px-4">
         <Link href="/" className="flex items-center">
           <span className="text-2xl font-extrabold tracking-tight font-heading text-white">
             Duti<span className="text-accent">ent</span>
@@ -76,7 +76,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-0.5 px-2 py-3">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -86,7 +86,7 @@ export function Sidebar({ className }: SidebarProps) {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all",
                 isActive
                   ? "bg-accent text-white shadow-lg"
                   : "text-gray-300 hover:bg-primary-light hover:text-white"
@@ -100,11 +100,11 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       {/* Settings & Logout at Bottom */}
-      <div className="border-t border-primary-light p-3 space-y-1">
+      <div className="border-t border-primary-light p-2 space-y-0.5">
         <Link
           href="/settings"
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+            "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all",
             pathname === "/settings"
               ? "bg-accent text-white"
               : "text-gray-300 hover:bg-primary-light hover:text-white"
@@ -113,11 +113,11 @@ export function Sidebar({ className }: SidebarProps) {
           <Settings className="h-5 w-5" />
           <span>Settings</span>
         </Link>
-        
+
         <form action={logout}>
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-300 hover:bg-primary-light hover:text-white transition-all"
+            className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-300 hover:bg-primary-light hover:text-white transition-all"
           >
             <LogOut className="h-5 w-5" />
             <span>Logout</span>
