@@ -11,7 +11,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { FilterBar } from "@/components/candidates/filter-bar";
 
 import { RankingModal } from "@/components/candidates/ranking-modal";
-import { matchCandidates } from "@/app/actions/matchCandidates";
+import { rankCandidates } from "@/app/actions/rank-candidates";
 import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -87,27 +87,28 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
   const handleRankCandidates = async (jobDescription: string) => {
     setIsRanking(true);
     try {
-      // Get IDs of currently filtered candidates
       const candidateIds = filteredCandidates.map(c => c.id);
+      const result = await rankCandidates(jobDescription, candidateIds);
 
-      console.log(`Ranking ${candidateIds.length} candidates...`);
-
-      // Call server action
-      await matchCandidates(jobDescription, candidateIds);
-
-      toast({
-        title: "Ranking Complete",
-        description: `Successfully ranked ${candidateIds.length} candidates based on relevance.`,
-      });
-
-      // Refresh to show updated scores
-      router.refresh();
-      setIsRankingModalOpen(false);
+      if (result.success) {
+        toast({
+          title: "Ranking Complete ✅",
+          description: `Scored ${result.results?.length ?? 0} of ${candidateIds.length} candidates. Grid is now sorted by best fit.`,
+        });
+        router.refresh();
+        setIsRankingModalOpen(false);
+      } else {
+        toast({
+          title: "Ranking Failed",
+          description: result.message || "An error occurred. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Ranking error:", error);
       toast({
         title: "Ranking Failed",
-        description: "An error occurred while ranking candidates. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {

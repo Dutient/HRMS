@@ -19,7 +19,7 @@ interface FileWithPreview extends File {
 export function BulkUploadZone() {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const { startUpload, isUploading, progress, uploadedCount, totalCount, filesQueue } = useUpload();
+  const { startUpload, isUploading, progress, uploadedCount, totalCount, filesQueue, cancelUpload } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -206,7 +206,17 @@ export function BulkUploadZone() {
           <CardContent className="p-6 space-y-4">
             <div className="flex justify-between text-sm font-medium">
               <span>Processing...</span>
-              <span>{Math.round(progress)}%</span>
+              <div className="flex items-center gap-4">
+                <span>{Math.round(progress)}%</span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={cancelUpload}
+                  className="h-7 px-3 text-xs"
+                >
+                  Stop Upload
+                </Button>
+              </div>
             </div>
             <Progress value={progress} className="h-2" />
             <p className="text-sm text-text-muted text-center">

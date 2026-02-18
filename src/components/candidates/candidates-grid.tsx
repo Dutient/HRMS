@@ -30,12 +30,17 @@ export function CandidatesGrid({ candidates }: CandidatesGridProps) {
     );
   }
 
-  // Calculate max score to identify "Best Fit" candidates
-  const maxScore = Math.max(...candidates.map(c => c.match_score || 0));
+  // Sort by match_score descending — unscored (null) candidates go to the bottom
+  const sorted = [...candidates].sort(
+    (a, b) => (b.match_score ?? -1) - (a.match_score ?? -1)
+  );
+
+  // Best Fit = the highest scorer (only when at least one candidate has a score)
+  const maxScore = sorted[0]?.match_score ?? 0;
 
   return (
     <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {candidates.map((candidate) => (
+      {sorted.map((candidate) => (
         <CandidateCard
           key={candidate.id}
           candidate={candidate}

@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { BedrockEmbeddings } from "@langchain/aws";
 import { ChatBedrockConverse } from "@langchain/aws";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { revalidatePath } from "next/cache";
 
 // Initialize Supabase (Service Role for RLS bypass logic if needed, but normally Anon is fine if policies allow)
 // However, for RPC we might need permissions. Let's use Service Role to be safe for backend logic.
@@ -109,6 +110,16 @@ Output JSON only in this format:
                 const jsonMatch = content.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                     const parsed = JSON.parse(jsonMatch[0]);
+
+                    // Persist score back to the candidates table
+                    await supabase
+                        .from("candidates")
+                        .update({
+                            match_score: parsed.score,
+                            ai_justification: parsed.justification,
+                        })
+                        .eq("id", candidate.id);
+
                     return {
                         candidateId: candidate.id,
                         name: candidate.name,
@@ -130,6 +141,9 @@ Output JSON only in this format:
         const finalResults = ranked
             .filter((r): r is MatchResult => r !== null)
             .sort((a, b) => b.matchScore - a.matchScore);
+
+        // Revalidate candidates page so scores are reflected immediately
+        revalidatePath("/candidates");
 
         return finalResults;
 
