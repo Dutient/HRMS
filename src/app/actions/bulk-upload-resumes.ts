@@ -188,21 +188,10 @@ export async function uploadResumesAndCreateCandidates(
 
     console.log(`✅ Created candidate: ${candidateData.name}`);
 
-    // Step F: Trigger AI Scoring (Fire and Forget or Await?)
-    // We await it to ensure the user gets immediate feedback on the UI if they refresh
-    try {
-      const { scoreSingleCandidate } = await import("@/app/actions/scoreCandidate");
-      // Use provided metadata position/job opening as context if available, otherwise "General Requirements"
-      // Actually, let's construct a decent context string
-      let context = "General Requirements";
-      if (metadata?.job_opening) context = `Job Opening: ${metadata.job_opening}`;
-      if (metadata?.position) context += `, Position: ${metadata.position}`;
-
-      console.log(`⚡ Triggering AI Scoring with context: ${context}`);
-      await scoreSingleCandidate(candidateData.id, context, resumeText);
-    } catch (scoreErr) {
-      console.error("⚠️ Automatic scoring failed (non-fatal):", scoreErr);
-    }
+    // Note: Auto-scoring removed intentionally.
+    // Candidates are inserted with match_score: null.
+    // Scores are assigned on-demand via the "Rank Candidates" button on /candidates,
+    // which calls rankCandidates() with a real JD and persists scores to the DB.
 
     // Revalidate candidates page
     revalidatePath("/candidates");
