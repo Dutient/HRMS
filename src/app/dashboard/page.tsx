@@ -1,19 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, FileCheck, Calendar, TrendingUp } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
-    // const supabase = await createClient(); // Not using SSR client for now as setup is simple
+    const supabase = await createClient();
 
-    if (!supabase) {
-        return (
-            <div className="p-8 text-center text-red-500">
-                Supabase not configured. Please check your environment variables.
-            </div>
-        );
-    }
-
+    // Auth check using cookie-aware server client (prevents redirect loops)
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -25,14 +18,15 @@ export default async function DashboardPage() {
         .from("candidates")
         .select("*", { count: "exact", head: true });
 
-    const { count: offerCandidates } = await supabase
+    // 'Selected' matches the Candidate status enum (not 'Offer' which doesn't exist)
+    const { count: selectedCandidates } = await supabase
         .from("candidates")
         .select("*", { count: "exact", head: true })
-        .eq("status", "Offer");
+        .eq("status", "Selected");
 
     // Mock data for now as we don't have interviews table yet
     const interviewsToday = 0;
-    const selectionRate = totalCandidates ? Math.round(((offerCandidates || 0) / totalCandidates) * 100) : 0;
+    const selectionRate = totalCandidates ? Math.round(((selectedCandidates || 0) / totalCandidates) * 100) : 0;
 
     return (
         <div className="space-y-6">
@@ -47,7 +41,7 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{totalCandidates || 0}</div>
-                        <p className="text-xs text-muted-foreground">+2 from last month</p>
+                        <p className="text-xs text-muted-foreground">All candidates in system</p>
                     </CardContent>
                 </Card>
 
@@ -59,7 +53,7 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{selectionRate}%</div>
-                        <p className="text-xs text-muted-foreground">Based on offers given</p>
+                        <p className="text-xs text-muted-foreground">Based on &apos;Selected&apos; status</p>
                     </CardContent>
                 </Card>
 
@@ -82,8 +76,8 @@ export default async function DashboardPage() {
                         <FileCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{offerCandidates || 0}</div>
-                        <p className="text-xs text-muted-foreground">Candidates in 'Offer' stage</p>
+                        <div className="text-2xl font-bold">{selectedCandidates || 0}</div>
+                        <p className="text-xs text-muted-foreground">Candidates in &apos;Selected&apos; stage</p>
                     </CardContent>
                 </Card>
             </div>

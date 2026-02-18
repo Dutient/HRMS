@@ -21,6 +21,7 @@ import {
 import { deleteCandidate } from "@/app/actions/deleteCandidate";
 import type { Candidate } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import {
   Tooltip,
   TooltipContent,
@@ -90,6 +91,7 @@ const getInitials = (name: string) =>
 
 export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   const handleViewProfile = () => {
     if (!candidate.resume_url) {
@@ -116,6 +118,9 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
         description: result.message,
         variant: result.success ? "default" : "destructive",
       });
+      if (result.success) {
+        router.refresh(); // Refresh server data — removes card from grid
+      }
     }
   };
 

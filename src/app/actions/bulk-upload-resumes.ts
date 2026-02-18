@@ -96,6 +96,9 @@ export async function uploadResumesAndCreateCandidates(
     let resumeText = "";
     try {
       resumeText = await extractTextFromPDF(buffer);
+      // 🔐 Sanitize null bytes — Postgres rejects \u0000 in text columns
+      // eslint-disable-next-line no-control-regex
+      resumeText = resumeText.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     } catch (err) {
       console.error(`❌ Failed to extract text from PDF:`, err);
       // Cleanup uploaded file
@@ -141,18 +144,9 @@ export async function uploadResumesAndCreateCandidates(
       vectorElement = await embeddings.embedQuery(resumeText);
       console.log("✅ Vector embedding generated");
     } catch (err) {
-      console.error("❌ Embedding generation failed:", err);
-      // We continue without embedding, or fail? User request implies we MUST have it.
-      // But for bulk upload resilience, maybe we note it?
-      // For now, let's just log and continue, inserting null if the column allows (it might NOT).
-      // Actually, the previous 'ingestResume.ts' insertion succeded with vector.
-      // Let's assume we want to fail for this candidate if embedding fails, to ensure data consistency.
-      await supabase.storage.from("resumes").remove([uploadData.path]);
-      return {
-        fileName: file.name,
-        success: false,
-        message: "Embedding generation failed",
-      };
+      console.warn("⚠️ Embedding generation failed — inserting candidate with null embedding:", err);
+      // Soft-fail: continue without embedding rather than discarding the entire candidate
+      vectorElement = null;
     }
 
     // Step E: Insert candidate record with all fields

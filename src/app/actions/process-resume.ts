@@ -183,14 +183,6 @@ export async function processResume(formData: FormData): Promise<{
       };
     }
 
-    // Check if Gemini API key is configured
-    if (!process.env.GEMINI_API_KEY) {
-      return {
-        success: false,
-        message: "Gemini API key not configured. Please add GEMINI_API_KEY to .env.local",
-      };
-    }
-
     // Extract file from FormData
     const file = formData.get("file") as File;
     if (!file) {

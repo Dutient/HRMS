@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode, useRef, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode, useRef } from "react";
 import { uploadResumesAndCreateCandidates } from "@/app/actions/bulk-upload-resumes";
 
 interface FileStatus {
@@ -31,12 +31,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const [filesQueue, setFilesQueue] = useState<FileStatus[]>([]);
   const uploadAbortRef = useRef(false);
 
-  // Reset abort flag when upload starts
-  useEffect(() => {
-    if (isUploading) {
-      uploadAbortRef.current = false;
-    }
-  }, [isUploading]);
 
   const startUpload = useCallback(async (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => {
     // Validate file count
