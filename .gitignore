@@ -54,3 +54,5 @@ supabase/.temp/
 docs/*.pdf
 
 *.png
+# Audit reports
+audit.md
