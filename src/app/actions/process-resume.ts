@@ -1,12 +1,9 @@
 "use server";
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import mammoth from "mammoth";
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 interface ExtractedData {
   name: string;
@@ -54,38 +51,95 @@ function extractTextFromTXT(buffer: Buffer): string {
   return buffer.toString("utf-8");
 }
 
+// Initialize Bedrock Client
+import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@aws-sdk/client-bedrock-runtime";
+
+const bedrock = new BedrockRuntimeClient({
+  region: "us-east-1", // Hardcoded per requirement or use process.env.BEDROCK_AWS_REGION
+  credentials: {
+    accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
+  },
+});
+
 /**
- * Use Gemini AI to extract structured data from resume text
+ * Invoke Bedrock with Exponential Backoff
  */
-export async function extractDataWithGemini(
-  resumeText: string
-): Promise<ExtractedData> {
-  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-  const prompt = `You are an expert resume parser. Extract the following information from this resume and return ONLY a valid JSON object with no additional text or markdown formatting:
-
-{
-  "name": "full name of the candidate",
-  "email": "email address",
-  "phone": "phone number (or null if not found)",
-  "role": "infer the primary job role/title based on experience and skills",
-  "experience": number of years of experience as an integer,
-  "skills": ["array", "of", "key", "skills"],
-  "summary": "a single sentence summarizing their expertise and experience"
+async function invokeBedrockWithBackoff(
+  command: InvokeModelCommand,
+  retries = 3,
+  delay = 1000
+): Promise<any> {
+  try {
+    return await bedrock.send(command);
+  } catch (error) {
+    if (retries > 0 && (error instanceof ThrottlingException || (error as any).name === "ThrottlingException" || (error as any).statusCode === 429)) {
+      console.warn(`⚠️ Bedrock Throttled. Retrying in ${delay}ms... (${retries} retries left)`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return invokeBedrockWithBackoff(command, retries - 1, delay * 2);
+    }
+    throw error;
+  }
 }
 
-Resume text:
-${resumeText}
+/**
+ * Use AWS Bedrock (Claude 4.5 Haiku) to extract structured data from resume text
+ */
+export async function extractDataWithBedrock(
+  resumeText: string
+): Promise<ExtractedData> {
+  const modelId = "us.anthropic.claude-haiku-4-5-20251001-v1:0"; // Use US inference profile for on-demand throughput
 
-Remember: Return ONLY the JSON object, nothing else.`;
+  const prompt = `You are an expert resume parser. Extract the following information from this resume and return ONLY a valid JSON object.
+
+<resume>
+${resumeText}
+</resume>
+
+Return a JSON object with this exact schema:
+{
+  "name": "full name",
+  "email": "email address",
+  "phone": "phone number or null",
+  "role": "inferred job role",
+  "experience": number_of_years_int,
+  "skills": ["skill1", "skill2"],
+  "summary": "brief summary"
+}
+
+Do not include any text before or after the JSON.`;
+
+  const payload = {
+    anthropic_version: "bedrock-2023-05-31",
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: prompt,
+          },
+        ],
+      },
+    ],
+    temperature: 0.1,
+  };
+
+  const command = new InvokeModelCommand({
+    modelId,
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify(payload),
+  });
 
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = await invokeBedrockWithBackoff(command);
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const outputText = responseBody.content[0].text;
 
-    // Clean up the response - remove markdown code blocks if present
-    let jsonText = text.trim();
+    // Clean up response if needed (though Claude is usually good with "ONLY JSON")
+    let jsonText = outputText.trim();
     if (jsonText.startsWith("```json")) {
       jsonText = jsonText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
     } else if (jsonText.startsWith("```")) {
@@ -95,16 +149,26 @@ Remember: Return ONLY the JSON object, nothing else.`;
     const parsedData = JSON.parse(jsonText);
 
     // Validate required fields
-    if (!parsedData.name || !parsedData.email || !parsedData.role) {
-      throw new Error("Missing required fields in extracted data");
+    if (!parsedData.name || !parsedData.email) {
+      throw new Error("Missing required fields (name, email) in extracted data");
     }
 
     return parsedData as ExtractedData;
   } catch (error) {
-    console.error("Error extracting data with Gemini:", error);
-    throw new Error("Failed to parse resume with AI");
+    console.error("❌ Error extracting data with Bedrock:", error);
+    throw new Error("Failed to parse resume with AI (Bedrock)");
   }
 }
+
+// Keep Gemini function for backward compatibility if needed, or remove.
+// For now, removing usages in this file but keeping the function commented out or replacing it.
+// The instruction said "Replace", so I will replace the export.
+// But I need to support `extractDataWithGemini` calls if any other file uses it?
+// `bulk-upload-resumes.ts` is the only consumer.
+// So I will just replace the function body or rename.
+// Let's replace `extractDataWithGemini` entirely with `extractDataWithBedrock` but keep the name if we want minimal refactor,
+// OR better, export `extractDataWithBedrock` and update the consumer. 
+// I will REPLACE the content of the `extractDataWithGemini` function block with `extractDataWithBedrock` code and rename it to `extractDataWithBedrock`.
 
 /**
  * Process a single resume file
@@ -201,9 +265,9 @@ export async function processResume(formData: FormData): Promise<{
       };
     }
 
-    // Extract structured data using Gemini
-    console.log("🤖 Extracting data with Gemini AI...");
-    const extractedData = await extractDataWithGemini(resumeText);
+    // Extract structured data using Bedrock
+    console.log("🤖 Extracting data with Bedrock (Claude 4.5 Haiku)...");
+    const extractedData = await extractDataWithBedrock(resumeText);
     console.log(`✅ Extracted data for: ${extractedData.name} (${extractedData.email})`);
 
     // Check if candidate already exists

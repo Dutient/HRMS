@@ -45,8 +45,8 @@ export async function uploadResumesAndCreateCandidates(
 
   console.log(`📄 Processing single file: ${file.name}`);
 
-  // Import Gemini resume parser from process-resume
-  const { extractTextFromPDF, extractDataWithGemini } = await import("@/app/actions/process-resume");
+  // Import Bedrock resume parser from process-resume
+  const { extractTextFromPDF, extractDataWithBedrock } = await import("@/app/actions/process-resume");
 
   try {
     // Validate file type
@@ -107,18 +107,18 @@ export async function uploadResumesAndCreateCandidates(
       };
     }
 
-    // Step D: Use Gemini to parse resume and extract candidate fields
+    // Step D: Use Bedrock (Claude 4.5 Haiku) to parse resume and extract candidate fields
     let extractedData;
     try {
-      extractedData = await extractDataWithGemini(resumeText);
+      extractedData = await extractDataWithBedrock(resumeText);
     } catch (err) {
-      console.error(`❌ Gemini extraction failed:`, err);
+      console.error(`❌ Bedrock extraction failed:`, err);
       // Cleanup uploaded file
       await supabase.storage.from("resumes").remove([uploadData.path]);
       return {
         fileName: file.name,
         success: false,
-        message: "Gemini extraction failed",
+        message: "Bedrock extraction failed",
       };
     }
 

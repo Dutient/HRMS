@@ -30,12 +30,16 @@ export function CandidatesGrid({ candidates }: CandidatesGridProps) {
     );
   }
 
+  // Calculate max score to identify "Best Fit" candidates
+  const maxScore = Math.max(...candidates.map(c => c.match_score || 0));
+
   return (
     <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       {candidates.map((candidate) => (
         <CandidateCard
           key={candidate.id}
           candidate={candidate}
+          isBestFit={maxScore > 0 && candidate.match_score === maxScore}
         />
       ))}
     </div>

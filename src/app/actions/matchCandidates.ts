@@ -25,9 +25,12 @@ export interface MatchResult {
     justification: string;
 }
 
-export async function matchCandidates(jobDescription: string): Promise<MatchResult[]> {
+export async function matchCandidates(jobDescription: string, candidateIds?: string[]): Promise<MatchResult[]> {
     try {
         console.log("🔍 Starting Match Process for JD:", jobDescription.substring(0, 50) + "...");
+        if (candidateIds) {
+            console.log(`🎯 Filtering by ${candidateIds.length} candidate IDs`);
+        }
 
         // 1. Convert Job Description to Vector Embedding (Titan v1)
         const embeddings = new BedrockEmbeddings({
@@ -46,7 +49,8 @@ export async function matchCandidates(jobDescription: string): Promise<MatchResu
         const { data: candidates, error } = await supabase.rpc("match_candidates", {
             query_embedding: jdVector,
             match_threshold: 0.1, // Loose threshold to get enough candidates
-            match_count: 5 // Get top 5 for ranking
+            match_count: 10, // Increased count for filtered search
+            filter_ids: candidateIds || null
         });
 
         if (error) {

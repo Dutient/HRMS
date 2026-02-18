@@ -21,7 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 
 interface CandidateCardProps {
   candidate: Candidate;
+  isBestFit?: boolean;
 }
+
 
 import {
   Tooltip,
@@ -31,11 +33,11 @@ import {
 } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 
-const getMatchScoreBadge = (score: number | null, justification?: string | null) => {
+const getMatchScoreBadge = (score: number | null, justification?: string | null, isBestFit?: boolean) => {
   if (score === null || score === undefined) return null;
 
   let colorClass = "bg-warning/10 text-warning border-warning/20"; // 70-89
-  const icon = <Star className="h-3 w-3 mr-1 fill-current" />;
+  const icon = <Star className={`h-3 w-3 mr-1 fill-current ${isBestFit ? "text-amber-500" : ""}`} />;
 
   if (score >= 90) {
     colorClass = "bg-success/10 text-success border-success/20"; // >= 90
@@ -43,8 +45,11 @@ const getMatchScoreBadge = (score: number | null, justification?: string | null)
     colorClass = "bg-gray-100 text-gray-600 border-gray-200"; // < 70
   }
 
+  // Add glow if Best Fit
+  const glowClass = isBestFit ? "shadow-[0_0_10px_rgba(251,191,36,0.5)] border-amber-400/50" : "";
+
   const badge = (
-    <Badge className={`${colorClass} cursor-help flex items-center gap-1`}>
+    <Badge className={`${colorClass} ${glowClass} cursor-help flex items-center gap-1`}>
       {icon}
       {score}% Match
       {justification && <Info className="h-3 w-3 ml-1 opacity-70" />}
@@ -95,6 +100,7 @@ const formatDate = (dateString: string) => {
 
 export function CandidateCard({
   candidate,
+  isBestFit,
 }: CandidateCardProps) {
   const { toast } = useToast();
 
@@ -122,13 +128,19 @@ export function CandidateCard({
     window.location.href = mailtoLink;
   };
   return (
-    <Card className="transition-all hover:shadow-lg hover:border-accent/40">
-      <CardContent className="p-5 space-y-4">
+    <Card className={`transition-all hover:shadow-lg relative overflow-hidden ${isBestFit ? "border-amber-400 border-2 shadow-md" : "hover:border-accent/40"}`}>
+      {isBestFit && (
+        <div className="absolute top-0 left-0 bg-amber-400 text-white text-[10px] font-bold px-2 py-1 rounded-br-lg flex items-center gap-1 z-10 shadow-sm">
+          <Star className="h-3 w-3 fill-current" />
+          BEST FIT
+        </div>
+      )}
+      <CardContent className="p-5 space-y-4 pt-7">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <Avatar className="h-12 w-12 border-2 border-accent/20">
+          <Avatar className={`h-12 w-12 border-2 ${isBestFit ? "border-amber-400" : "border-accent/20"}`}>
             <AvatarImage src={candidate.avatar_url || ""} />
-            <AvatarFallback className="bg-accent text-white font-semibold">
+            <AvatarFallback className={`${isBestFit ? "bg-amber-100 text-amber-700" : "bg-accent text-white"} font-semibold`}>
               {candidate.name
                 .split(" ")
                 .map((n) => n[0])
@@ -146,7 +158,7 @@ export function CandidateCard({
                   {candidate.role}
                 </p>
               </div>
-              {getMatchScoreBadge(candidate.match_score, (candidate as any).ai_justification)}
+              {getMatchScoreBadge(candidate.match_score, (candidate as any).ai_justification, isBestFit)}
             </div>
 
             {/* Source Badge */}
