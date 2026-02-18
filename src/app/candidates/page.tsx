@@ -3,7 +3,7 @@ import { Users } from "lucide-react";
 import { getCandidates, getFilterOptions } from "@/app/actions/get-candidates";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { SupabaseSetupBanner } from "@/components/candidates/supabase-setup-banner";
-import { AISearchPanel } from "@/components/candidates/ai-search-panel";
+
 import { CandidatesListClient } from "@/components/candidates/candidates-list-client";
 
 interface Props {
@@ -46,8 +46,7 @@ export default async function CandidatesPage({ searchParams }: Props) {
         </Badge>
       </div>
 
-      {/* AI Smart Search & Ranking */}
-      <AISearchPanel filters={filters} />
+
 
       {/* Search Bar & Candidates Grid (Client Component) */}
       <CandidatesListClient

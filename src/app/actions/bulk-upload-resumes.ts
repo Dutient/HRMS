@@ -45,8 +45,8 @@ export async function uploadResumesAndCreateCandidates(
 
   console.log(`📄 Processing single file: ${file.name}`);
 
-  // Import Gemini resume parser from process-resume
-  const { extractTextFromPDF, extractDataWithGemini } = await import("@/app/actions/process-resume");
+  // Import Bedrock resume parser from process-resume
+  const { extractTextFromPDF, extractDataWithBedrock } = await import("@/app/actions/process-resume");
 
   try {
     // Validate file type
@@ -107,18 +107,48 @@ export async function uploadResumesAndCreateCandidates(
       };
     }
 
-    // Step D: Use Gemini to parse resume and extract candidate fields
+    // Step D: Use Bedrock (Claude 4.5 Haiku) to parse resume and extract candidate fields
     let extractedData;
     try {
-      extractedData = await extractDataWithGemini(resumeText);
+      extractedData = await extractDataWithBedrock(resumeText);
     } catch (err) {
-      console.error(`❌ Gemini extraction failed:`, err);
+      console.error(`❌ Bedrock extraction failed:`, err);
       // Cleanup uploaded file
       await supabase.storage.from("resumes").remove([uploadData.path]);
       return {
         fileName: file.name,
         success: false,
-        message: "Gemini extraction failed",
+        message: "Bedrock extraction failed",
+      };
+    }
+
+    // Step D.1: Generate Vector Embedding using AWS Bedrock (Titan v1)
+    let vectorElement: number[] | null = null;
+    try {
+      const { BedrockEmbeddings } = await import("@langchain/aws");
+      const embeddings = new BedrockEmbeddings({
+        region: process.env.BEDROCK_AWS_REGION,
+        model: "amazon.titan-embed-text-v1", // Explicitly using v1 for 1536 dimensions
+        credentials: {
+          accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
+        },
+      });
+      console.log("🧠 Generating vector embedding...");
+      vectorElement = await embeddings.embedQuery(resumeText);
+      console.log("✅ Vector embedding generated");
+    } catch (err) {
+      console.error("❌ Embedding generation failed:", err);
+      // We continue without embedding, or fail? User request implies we MUST have it.
+      // But for bulk upload resilience, maybe we note it?
+      // For now, let's just log and continue, inserting null if the column allows (it might NOT).
+      // Actually, the previous 'ingestResume.ts' insertion succeded with vector.
+      // Let's assume we want to fail for this candidate if embedding fails, to ensure data consistency.
+      await supabase.storage.from("resumes").remove([uploadData.path]);
+      return {
+        fileName: file.name,
+        success: false,
+        message: "Embedding generation failed",
       };
     }
 
@@ -129,13 +159,15 @@ export async function uploadResumesAndCreateCandidates(
         name: extractedData.name,
         email: extractedData.email,
         phone: extractedData.phone,
-        role: extractedData.role,
+        resume_text: resumeText, // Ensure text is stored!
+        role: extractedData.role || "General Application", // Default per requirement
         experience: extractedData.experience,
         skills: extractedData.skills,
         summary: extractedData.summary,
         status: "New",
         source: "Bulk Upload",
         match_score: null,
+        embedding: vectorElement,
         applied_date: new Date().toISOString().split("T")[0],
         resume_url: resumeUrl,
         // Add metadata
@@ -158,6 +190,22 @@ export async function uploadResumesAndCreateCandidates(
     }
 
     console.log(`✅ Created candidate: ${candidateData.name}`);
+
+    // Step F: Trigger AI Scoring (Fire and Forget or Await?)
+    // We await it to ensure the user gets immediate feedback on the UI if they refresh
+    try {
+      const { scoreSingleCandidate } = await import("@/app/actions/scoreCandidate");
+      // Use provided metadata position/job opening as context if available, otherwise "General Requirements"
+      // Actually, let's construct a decent context string
+      let context = "General Requirements";
+      if (metadata?.job_opening) context = `Job Opening: ${metadata.job_opening}`;
+      if (metadata?.position) context += `, Position: ${metadata.position}`;
+
+      console.log(`⚡ Triggering AI Scoring with context: ${context}`);
+      await scoreSingleCandidate(candidateData.id, context, resumeText);
+    } catch (scoreErr) {
+      console.error("⚠️ Automatic scoring failed (non-fatal):", scoreErr);
+    }
 
     // Revalidate candidates page
     revalidatePath("/candidates");

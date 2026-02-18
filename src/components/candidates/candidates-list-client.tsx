@@ -8,14 +8,12 @@ import { Search, Filter } from "lucide-react";
 import { CandidatesGrid } from "@/components/candidates/candidates-grid";
 import type { Candidate } from "@/lib/supabase";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { X } from "lucide-react";
+import { FilterBar } from "@/components/candidates/filter-bar";
+
+import { RankingModal } from "@/components/candidates/ranking-modal";
+import { matchCandidates } from "@/app/actions/matchCandidates";
+import { Sparkles } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CandidatesListClientProps {
   candidates: Candidate[];
@@ -33,12 +31,16 @@ interface CandidatesListClientProps {
 
 export function CandidatesListClient({ candidates, filters, options }: CandidatesListClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
+  const [isRanking, setIsRanking] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
 
   // Handle filter change
   const handleFilterChange = (key: string, value: string) => {
+    // ... existing logic ...
     const params = new URLSearchParams(searchParams);
     if (value && value !== "all") {
       params.set(key, value);
@@ -82,13 +84,44 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
     });
   }, [candidates, searchQuery]);
 
+  const handleRankCandidates = async (jobDescription: string) => {
+    setIsRanking(true);
+    try {
+      // Get IDs of currently filtered candidates
+      const candidateIds = filteredCandidates.map(c => c.id);
+
+      console.log(`Ranking ${candidateIds.length} candidates...`);
+
+      // Call server action
+      await matchCandidates(jobDescription, candidateIds);
+
+      toast({
+        title: "Ranking Complete",
+        description: `Successfully ranked ${candidateIds.length} candidates based on relevance.`,
+      });
+
+      // Refresh to show updated scores
+      router.refresh();
+      setIsRankingModalOpen(false);
+    } catch (error) {
+      console.error("Ranking error:", error);
+      toast({
+        title: "Ranking Failed",
+        description: "An error occurred while ranking candidates. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRanking(false);
+    }
+  };
+
   return (
     <>
       {/* Search & Filter Bar */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
+          <div className="flex gap-3 justify-between">
+            <div className="relative flex-1 max-w-lg">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
               <Input
                 placeholder="Search by name, role, or skills..."
@@ -97,82 +130,38 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filters
-            </Button>
+
+            <div className="flex gap-2">
+              <Button
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={() => setIsRankingModalOpen(true)}
+                disabled={filteredCandidates.length === 0}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Rank Candidates
+              </Button>
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                Filters
+              </Button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 mt-4">
-            <Select
-              value={filters?.position || "all"}
-              onValueChange={(val) => handleFilterChange("position", val)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Position" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-black z-50">
-                <SelectItem value="all">All Positions</SelectItem>
-                {options?.positions && options.positions.length > 0 ? (
-                  options.positions.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-2 text-sm text-muted-foreground">No positions available</div>
-                )}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters?.job_opening || "all"}
-              onValueChange={(val) => handleFilterChange("job_opening", val)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Job Opening" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-black z-50">
-                <SelectItem value="all">All Jobs</SelectItem>
-                {options?.jobOpenings && options.jobOpenings.length > 0 ? (
-                  options.jobOpenings.map((j) => (
-                    <SelectItem key={j} value={j}>
-                      {j}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-2 text-sm text-muted-foreground">No jobs available</div>
-                )}
-              </SelectContent>
-            </Select>
-
-            <Select
-              value={filters?.domain || "all"}
-              onValueChange={(val) => handleFilterChange("domain", val)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Domain" />
-              </SelectTrigger>
-              <SelectContent className="bg-white text-black z-50">
-                <SelectItem value="all">All Domains</SelectItem>
-                {options?.domains && options.domains.length > 0 ? (
-                  options.domains.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <div className="px-2 py-2 text-sm text-muted-foreground">No domains available</div>
-                )}
-              </SelectContent>
-            </Select>
-
-            {hasActiveFilters && (
-              <Button variant="ghost" onClick={clearFilters} className="text-text-muted hover:text-primary">
-                <X className="mr-2 h-4 w-4" />
-                Clear Filters
-              </Button>
-            )}
+          <div className="mt-6 border-t pt-4">
+            <FilterBar
+              filters={{
+                position: filters?.position,
+                job_opening: filters?.job_opening,
+                domain: filters?.domain
+              }}
+              options={{
+                positions: options?.positions || [],
+                jobOpenings: options?.jobOpenings || [],
+                domains: options?.domains || []
+              }}
+              onFilterChange={handleFilterChange}
+              onClearFilters={clearFilters}
+            />
           </div>
           {searchQuery && (
             <p className="text-sm text-text-muted mt-3">
@@ -184,6 +173,14 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
 
       {/* Candidates Grid */}
       <CandidatesGrid candidates={filteredCandidates} />
+
+      <RankingModal
+        open={isRankingModalOpen}
+        onOpenChange={setIsRankingModalOpen}
+        onRank={handleRankCandidates}
+        loading={isRanking}
+        count={filteredCandidates.length}
+      />
     </>
   );
 }

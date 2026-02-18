@@ -104,7 +104,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
       // Rate limiting delay (3 seconds) - only if not the last file
       if (i < files.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 6000));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
