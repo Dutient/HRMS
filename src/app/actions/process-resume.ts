@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import mammoth from "mammoth";
 import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@aws-sdk/client-bedrock-runtime";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface ExtractedData {
   name: string;
   email: string;
@@ -15,9 +17,17 @@ interface ExtractedData {
   summary: string;
 }
 
-/**
- * Extract text from PDF file
- */
+// Fields the LLM extracts (email + phone are handled by regex)
+interface LLMExtractedData {
+  name: string;
+  role: string;
+  experience: number;
+  skills: string[];
+  summary: string;
+}
+
+// ─── Text Extraction Helpers ───────────────────────────────────────────────────
+
 export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   try {
     // @ts-expect-error - pdf-parse is a CommonJS module
@@ -31,9 +41,6 @@ export async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   }
 }
 
-/**
- * Extract text from DOCX file
- */
 export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   try {
     const result = await mammoth.extractRawText({ buffer });
@@ -44,25 +51,37 @@ export async function extractTextFromDOCX(buffer: Buffer): Promise<string> {
   }
 }
 
-/**
- * Extract text from TXT file
- */
 function extractTextFromTXT(buffer: Buffer): string {
   return buffer.toString("utf-8");
 }
 
-// Initialize Bedrock Client
+// ─── Regex Pre-Processing ─────────────────────────────────────────────────────
+
+/**
+ * Extract email and phone from raw resume text using regex.
+ * This avoids sending these trivially parseable fields to the LLM,
+ * saving input/output tokens on every single upload.
+ */
+function extractFieldsWithRegex(text: string): { email: string | null; phone: string | null } {
+  const emailMatch = text.match(/[\w.+\-]+@[\w\-]+\.[a-z]{2,}/i);
+  const phoneMatch = text.match(/(\+?\d[\d\s\-(). ]{7,}\d)/);
+
+  return {
+    email: emailMatch?.[0]?.trim() ?? null,
+    phone: phoneMatch?.[0]?.trim() ?? null,
+  };
+}
+
+// ─── Bedrock Client ───────────────────────────────────────────────────────────
+
 const bedrock = new BedrockRuntimeClient({
-  region: "us-east-1", // Hardcoded per requirement or use process.env.BEDROCK_AWS_REGION
+  region: process.env.BEDROCK_AWS_REGION ?? "us-east-1",
   credentials: {
     accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
   },
 });
 
-/**
- * Invoke Bedrock with Exponential Backoff
- */
 async function invokeBedrockWithBackoff(
   command: InvokeModelCommand,
   retries = 3,
@@ -71,7 +90,12 @@ async function invokeBedrockWithBackoff(
   try {
     return await bedrock.send(command);
   } catch (error) {
-    if (retries > 0 && (error instanceof ThrottlingException || (error as any).name === "ThrottlingException" || (error as any).statusCode === 429)) {
+    if (
+      retries > 0 &&
+      (error instanceof ThrottlingException ||
+        (error as any).name === "ThrottlingException" ||
+        (error as any).statusCode === 429)
+    ) {
       console.warn(`⚠️ Bedrock Throttled. Retrying in ${delay}ms... (${retries} retries left)`);
       await new Promise((resolve) => setTimeout(resolve, delay));
       return invokeBedrockWithBackoff(command, retries - 1, delay * 2);
@@ -80,48 +104,57 @@ async function invokeBedrockWithBackoff(
   }
 }
 
+// ─── LLM Extraction (Nova Micro) ──────────────────────────────────────────────
+
 /**
- * Use AWS Bedrock (Claude 4.5 Haiku) to extract structured data from resume text
+ * Use AWS Bedrock (Amazon Nova Micro) to extract structured data from resume text.
+ * 
+ * Cost vs. old Haiku 4.5:
+ *   Nova Micro input:  $0.04 / 1M tokens  (was $1.00 — 25× cheaper)
+ *   Nova Micro output: $0.16 / 1M tokens  (was $5.00 — 31× cheaper)
+ *
+ * Scope is intentionally narrow — email and phone are pre-extracted by regex
+ * and merged in afterward to minimize token usage.
  */
 export async function extractDataWithBedrock(
   resumeText: string
 ): Promise<ExtractedData | null> {
-  const modelId = "us.anthropic.claude-haiku-4-5-20251001-v1:0"; // Use US inference profile for on-demand throughput
+  // ① Regex extraction — free, instant, zero tokens
+  const { email: regexEmail, phone: regexPhone } = extractFieldsWithRegex(resumeText);
 
-  const prompt = `You are an expert resume parser. Extract the following information from this resume and return ONLY a valid JSON object.
+  // ② Truncate input to 3,000 chars — sufficient for structured fields, saves ~60% of input tokens
+  const truncatedText = resumeText.substring(0, 3000);
+
+  const modelId = "amazon.nova-micro-v1:0";
+
+  // ③ Reduced prompt — no longer asks for email or phone
+  const prompt = `You are a resume parser. Extract information from the resume below and return ONLY a valid JSON object with no extra text.
 
 <resume>
-${resumeText}
+${truncatedText}
 </resume>
 
-Return a JSON object with this exact schema:
+Return this exact JSON schema:
 {
   "name": "full name",
-  "email": "email address",
-  "phone": "phone number or null",
-  "role": "inferred job role",
-  "experience": number_of_years_int,
+  "role": "inferred job title or role",
+  "experience": <integer years>,
   "skills": ["skill1", "skill2"],
-  "summary": "brief summary"
-}
+  "summary": "one sentence professional summary"
+}`;
 
-Do not include any text before or after the JSON.`;
-
+  // Nova Micro uses the Converse-style messages API
   const payload = {
-    anthropic_version: "bedrock-2023-05-31",
-    max_tokens: 4096,
     messages: [
       {
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: prompt,
-          },
-        ],
+        content: [{ text: prompt }],
       },
     ],
-    temperature: 0.1,
+    inferenceConfig: {
+      maxTokens: 512,
+      temperature: 0.1,
+    },
   };
 
   const command = new InvokeModelCommand({
@@ -134,9 +167,12 @@ Do not include any text before or after the JSON.`;
   try {
     const response = await invokeBedrockWithBackoff(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const outputText = responseBody.content[0].text;
 
-    // Clean up response if needed (though Claude is usually good with "ONLY JSON")
+    // Nova Micro response structure: output.message.content[0].text
+    const outputText: string =
+      responseBody?.output?.message?.content?.[0]?.text ?? "";
+
+    // Strip any markdown code fences Claude/Nova might wrap around JSON
     let jsonText = outputText.trim();
     if (jsonText.startsWith("```json")) {
       jsonText = jsonText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
@@ -144,38 +180,49 @@ Do not include any text before or after the JSON.`;
       jsonText = jsonText.replace(/```\n?/g, "");
     }
 
-    // Sanitize Null Bytes (Postgres doesn't like them)
-    // Also strip other non-printable chars if needed, but \u0000 is the main culprit
+    // Sanitize null bytes — PostgreSQL rejects \u0000 in text columns
     // eslint-disable-next-line no-control-regex
     jsonText = jsonText.replace(/\u0000/g, "");
 
-    const parsedData = JSON.parse(jsonText);
+    const llmData: LLMExtractedData = JSON.parse(jsonText);
 
-    // Validate required fields
-    if (!parsedData.name || !parsedData.email) {
-      console.warn("⚠️ Missing required fields (name, email) in extracted data, skipping.");
+    // ④ Validate the LLM returned a name at minimum
+    if (!llmData.name) {
+      console.warn("⚠️ LLM did not return a name — skipping candidate.");
       return null;
     }
 
-    return parsedData as ExtractedData;
+    // ⑤ Merge: LLM fields + regex-extracted email/phone
+    const merged: ExtractedData = {
+      name: llmData.name,
+      role: llmData.role ?? "General Application",
+      experience: typeof llmData.experience === "number" ? llmData.experience : 0,
+      skills: Array.isArray(llmData.skills) ? llmData.skills : [],
+      summary: llmData.summary ?? "",
+      email: regexEmail ?? "",   // falls back to empty string; DB insert will fail gracefully if truly missing
+      phone: regexPhone ?? null,
+    };
+
+    if (!merged.email) {
+      console.warn("⚠️ No email found by regex — skipping candidate.");
+      return null;
+    }
+
+    return merged;
   } catch (error) {
-    console.error("❌ Error extracting data with Bedrock:", error);
-    throw error; // Re-throw so processResume can handle it
+    console.error("❌ Error extracting data with Bedrock (Nova Micro):", error);
+    throw error;
   }
 }
 
-/**
- * Process a single resume file
- * @param formData - FormData containing the resume file
- * @returns Success status and message
- */
+// ─── Single Resume Processor (used by /upload page) ───────────────────────────
+
 export async function processResume(formData: FormData): Promise<{
   success: boolean;
   message: string;
   candidateName?: string;
 }> {
   try {
-    // Check if Supabase is configured
     if (!isSupabaseConfigured || !supabase) {
       return {
         success: false,
@@ -183,19 +230,14 @@ export async function processResume(formData: FormData): Promise<{
       };
     }
 
-    // Extract file from FormData
     const file = formData.get("file") as File;
     if (!file) {
       console.error("❌ No file found in form data");
-      return {
-        success: false,
-        message: "No file provided",
-      };
+      return { success: false, message: "No file provided" };
     }
 
     console.log(`📄 Processing file: ${file.name} (${file.type}, ${file.size} bytes)`);
 
-    // Validate file type
     const fileType = file.type;
     const fileName = file.name.toLowerCase();
     const validTypes = [
@@ -206,9 +248,7 @@ export async function processResume(formData: FormData): Promise<{
     const validExtensions = [".pdf", ".docx", ".txt"];
 
     const hasValidType = validTypes.includes(fileType);
-    const hasValidExtension = validExtensions.some((ext) =>
-      fileName.endsWith(ext)
-    );
+    const hasValidExtension = validExtensions.some((ext) => fileName.endsWith(ext));
 
     if (!hasValidType && !hasValidExtension) {
       return {
@@ -217,46 +257,34 @@ export async function processResume(formData: FormData): Promise<{
       };
     }
 
-    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     console.log(`✅ File converted to buffer (${buffer.length} bytes)`);
 
-    // Extract text based on file type
     let resumeText: string;
     if (fileName.endsWith(".pdf")) {
-      console.log("📖 Extracting text from PDF...");
       resumeText = await extractTextFromPDF(buffer);
     } else if (fileName.endsWith(".docx")) {
-      console.log("📖 Extracting text from DOCX...");
       resumeText = await extractTextFromDOCX(buffer);
-    } else if (fileName.endsWith(".txt")) {
-      console.log("📖 Extracting text from TXT...");
-      resumeText = extractTextFromTXT(buffer);
     } else {
-      return {
-        success: false,
-        message: "Unsupported file format",
-      };
+      resumeText = extractTextFromTXT(buffer);
     }
 
+    // eslint-disable-next-line no-control-regex
+    resumeText = resumeText.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     console.log(`✅ Extracted ${resumeText.length} characters of text`);
 
-    // Check if text was extracted
     if (!resumeText || resumeText.trim().length < 50) {
-      console.error(`❌ Not enough text extracted (${resumeText?.length || 0} chars)`);
       return {
         success: false,
         message: "Could not extract enough text from the file",
       };
     }
 
-    // Extract structured data using Bedrock
-    console.log("🤖 Extracting data with Bedrock (Claude 4.5 Haiku)...");
+    console.log("🤖 Extracting data with Bedrock (Nova Micro)...");
     const extractedData = await extractDataWithBedrock(resumeText);
 
     if (!extractedData) {
-      console.warn("⚠️ Extraction skipped due to missing required fields.");
       return {
         success: false,
         message: "Skipped: Missing Name or Email in resume",
@@ -265,8 +293,7 @@ export async function processResume(formData: FormData): Promise<{
 
     console.log(`✅ Extracted data for: ${extractedData.name} (${extractedData.email})`);
 
-    // Check if candidate already exists
-    console.log("🔍 Checking for duplicate candidate...");
+    // Duplicate check
     const { data: existingCandidate } = await supabase
       .from("candidates")
       .select("id")
@@ -274,7 +301,6 @@ export async function processResume(formData: FormData): Promise<{
       .single();
 
     if (existingCandidate) {
-      console.warn(`⚠️ Duplicate candidate found: ${extractedData.email}`);
       return {
         success: false,
         message: `Candidate with email ${extractedData.email} already exists`,
@@ -282,8 +308,6 @@ export async function processResume(formData: FormData): Promise<{
       };
     }
 
-    // Insert into Supabase
-    console.log("💾 Inserting candidate into database...");
     const { error } = await supabase.from("candidates").insert({
       name: extractedData.name,
       email: extractedData.email,
@@ -299,16 +323,10 @@ export async function processResume(formData: FormData): Promise<{
     });
 
     if (error) {
-      console.error("❌ Database error:", error);
-      return {
-        success: false,
-        message: `Database error: ${error.message}`,
-      };
+      return { success: false, message: `Database error: ${error.message}` };
     }
 
     console.log(`✅ Successfully added candidate: ${extractedData.name}`);
-
-    // Revalidate the candidates page to show new data
     revalidatePath("/candidates");
 
     return {
