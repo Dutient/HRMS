@@ -23,6 +23,9 @@ interface UploadContextType {
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
 
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 2000;
+
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -31,15 +34,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const [filesQueue, setFilesQueue] = useState<FileStatus[]>([]);
   const uploadAbortRef = useRef(false);
 
-
-  const startUpload = useCallback(async (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => {
-    // Validate file count
+  const startUpload = useCallback(async (
+    files: File[],
+    metadata?: { position?: string; job_opening?: string; domain?: string }
+  ) => {
     if (files.length > 50) {
       alert("Maximum 50 files allowed per upload");
       return;
     }
 
-    // Initialize upload state
+    // Initialize queue — all files start as pending
     const initialQueue: FileStatus[] = files.map((file) => ({
       name: file.name,
       status: "pending",
@@ -52,58 +56,68 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     setProgress(0);
     uploadAbortRef.current = false;
 
-    // Process files sequentially
-    for (let i = 0; i < files.length; i++) {
-      // Check if upload was aborted (optional future feature, but good practice)
+    let completedCount = 0;
+
+    // Split files into micro-batches of BATCH_SIZE
+    for (let batchStart = 0; batchStart < files.length; batchStart += BATCH_SIZE) {
       if (uploadAbortRef.current) break;
 
-      const file = files[i];
+      const batchFiles = files.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchIndices = batchFiles.map((_, i) => batchStart + i);
 
-      // Update status to processing
-      setFilesQueue(prev => prev.map((item, index) =>
-        index === i ? { ...item, status: "processing" } : item
-      ));
+      // Mark all files in this batch as "processing"
+      setFilesQueue((prev) =>
+        prev.map((item, index) =>
+          batchIndices.includes(index) ? { ...item, status: "processing" } : item
+        )
+      );
 
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
+      // Fire all files in the batch simultaneously
+      const batchResults = await Promise.allSettled(
+        batchFiles.map(async (file, localIdx) => {
+          const globalIdx = batchStart + localIdx;
+          const formData = new FormData();
+          formData.append("file", file);
+          const result = await uploadResumesAndCreateCandidates(formData, metadata);
+          return { globalIdx, result };
+        })
+      );
 
-        // Call server action for single file
-        const result = await uploadResumesAndCreateCandidates(formData, metadata);
+      // Update each file's status based on its settled result
+      setFilesQueue((prev) => {
+        const updated = [...prev];
+        for (const settled of batchResults) {
+          if (settled.status === "fulfilled") {
+            const { globalIdx, result } = settled.value;
+            updated[globalIdx] = {
+              ...updated[globalIdx],
+              status: result.success ? "success" : "error",
+              message: result.message,
+              candidateName: result.candidateName,
+            };
+          } else {
+            // Promise itself rejected (network error, etc.)
+            const localIdx = batchResults.indexOf(settled);
+            const globalIdx = batchStart + localIdx;
+            updated[globalIdx] = {
+              ...updated[globalIdx],
+              status: "error",
+              message: settled.reason instanceof Error ? settled.reason.message : "Unexpected error",
+            };
+          }
+        }
+        return updated;
+      });
 
-        // Update status based on result
-        setFilesQueue(prev => prev.map((item, index) =>
-          index === i ? {
-            ...item,
-            status: result.success ? "success" : "error",
-            message: result.message,
-            candidateName: result.candidateName
-          } : item
-        ));
+      // Update progress counters
+      completedCount += batchFiles.length;
+      setUploadedCount(completedCount);
+      setProgress(Math.round((completedCount / files.length) * 100));
 
-      } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
-        setFilesQueue(prev => prev.map((item, index) =>
-          index === i ? {
-            ...item,
-            status: "error",
-            message: error instanceof Error ? error.message : "Unexpected error"
-          } : item
-        ));
-      }
-
-      // Update progress
-      const currentCount = i + 1;
-      setUploadedCount(currentCount);
-      setProgress(Math.round((currentCount / files.length) * 100));
-
-      // Rate limiting delay (3 seconds) - only if not the last file
-      if (i < files.length - 1) {
-        // Wait 500ms
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Final check before loop increments and starts next file
-        if (uploadAbortRef.current) break;
+      // Wait between batches to respect Bedrock rate limits (skip delay after last batch)
+      const isLastBatch = batchStart + BATCH_SIZE >= files.length;
+      if (!isLastBatch && !uploadAbortRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
       }
     }
 
