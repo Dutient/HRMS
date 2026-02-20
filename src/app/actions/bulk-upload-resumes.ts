@@ -22,6 +22,7 @@ export async function uploadResumesAndCreateCandidates(
     position?: string;
     job_opening?: string;
     domain?: string;
+    source_url?: string;
   }
 ): Promise<UploadResult> {
   // Check if Supabase is configured
@@ -171,6 +172,7 @@ export async function uploadResumesAndCreateCandidates(
         position: metadata?.position || null,
         job_opening: metadata?.job_opening || null,
         domain: metadata?.domain || null,
+        source_url: metadata?.source_url || null,
       })
       .select()
       .single();

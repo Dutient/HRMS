@@ -9,6 +9,7 @@ import { CandidatesGrid } from "@/components/candidates/candidates-grid";
 import type { Candidate } from "@/lib/supabase";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { FilterBar } from "@/components/candidates/filter-bar";
+import { ExperienceSlider, RelocationToggle } from "@/components/candidates/filter-components";
 
 import { RankingModal } from "@/components/candidates/ranking-modal";
 import { rankCandidates } from "@/app/actions/rank-candidates";
@@ -21,6 +22,10 @@ interface CandidatesListClientProps {
     position?: string;
     job_opening?: string;
     domain?: string;
+    location?: string;
+    min_exp?: string;
+    max_exp?: string;
+    relocate?: string;
   };
   options?: {
     positions: string[];
@@ -38,9 +43,8 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  // Handle filter change
+  // Handle filter change — works for both legacy (position/job_opening/domain) and new filters
   const handleFilterChange = (key: string, value: string) => {
-    // ... existing logic ...
     const params = new URLSearchParams(searchParams);
     if (value && value !== "all") {
       params.set(key, value);
@@ -55,9 +59,29 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
     router.replace(pathname);
   };
 
-  const hasActiveFilters = filters?.position || filters?.job_opening || filters?.domain;
+  // ── New Filter Handlers ────────────────────────────────────────────────────
+  const handleExperienceChange = (min: number, max: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (min > 0) params.set("min_exp", String(min));
+    else params.delete("min_exp");
+    if (max < 30) params.set("max_exp", String(max));
+    else params.delete("max_exp");
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
-  // Filter candidates based on search query
+  const handleRelocationToggle = (checked: boolean) => {
+    handleFilterChange("relocate", checked ? "true" : "");
+  };
+
+  const hasActiveFilters =
+    filters?.position ||
+    filters?.job_opening ||
+    filters?.domain ||
+    filters?.min_exp ||
+    filters?.max_exp ||
+    filters?.relocate;
+
+  // Filter candidates based on search query (client-side text search)
   const filteredCandidates = useMemo(() => {
     if (!searchQuery.trim()) {
       return candidates;
@@ -65,21 +89,11 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
 
     const query = searchQuery.toLowerCase();
     return candidates.filter((candidate) => {
-      // Search in name
       if (candidate.name?.toLowerCase().includes(query)) return true;
-
-      // Search in role
       if (candidate.role?.toLowerCase().includes(query)) return true;
-
-      // Search in skills
       if (candidate.skills?.some((skill) => skill.toLowerCase().includes(query))) return true;
-
-      // Search in email
       if (candidate.email?.toLowerCase().includes(query)) return true;
-
-      // Search in location
       if (candidate.location?.toLowerCase().includes(query)) return true;
-
       return false;
     });
   }, [candidates, searchQuery]);
@@ -148,6 +162,20 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
             </div>
           </div>
 
+          {/* ── Advanced Filters Row ── */}
+          <div className="mt-3 border-t pt-3 flex flex-wrap items-end gap-4">
+            <ExperienceSlider
+              min={filters?.min_exp ? Number(filters.min_exp) : 0}
+              max={filters?.max_exp ? Number(filters.max_exp) : 30}
+              onChange={handleExperienceChange}
+            />
+            <RelocationToggle
+              checked={filters?.relocate === "true"}
+              onChange={handleRelocationToggle}
+            />
+          </div>
+
+          {/* ── Legacy Filters (Position / Job / Domain) ── */}
           <div className="mt-3 border-t pt-3">
             <FilterBar
               filters={{

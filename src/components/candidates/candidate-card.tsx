@@ -17,6 +17,8 @@ import {
   FileText,
   Trash2,
   CalendarCheck,
+  MapPin,
+  Plane,
 } from "lucide-react";
 import { deleteCandidate } from "@/app/actions/deleteCandidate";
 import type { Candidate } from "@/lib/supabase";
@@ -197,6 +199,23 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
               </span>
             )}
           </div>
+          {/* Location & Relocation */}
+          {(candidate.location || candidate.will_relocate) && (
+            <div className="flex items-center gap-2">
+              {candidate.location && (
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-accent/70" />
+                  <span className="truncate">{candidate.location}</span>
+                </div>
+              )}
+              {candidate.will_relocate && (
+                <Badge className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0 h-4 shrink-0 gap-0.5">
+                  <Plane className="h-2.5 w-2.5" />
+                  Relocate
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Skills ── */}
@@ -262,6 +281,6 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
         </div>
 
       </CardContent>
-    </Card>
+    </Card >
   );
 }

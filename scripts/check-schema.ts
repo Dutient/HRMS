@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 import path from "path";
 
 // Load environment variables from .env.local
-dotenv.config({ path: path.resolve(__dirname, ".env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -22,7 +22,7 @@ async function checkSchema() {
     // Try to select the new columns
     const { data, error } = await supabase
         .from("candidates")
-        .select("position, job_opening, domain")
+        .select("location, will_relocate, source_url")
         .limit(1);
 
     if (error) {

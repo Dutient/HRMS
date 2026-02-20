@@ -17,6 +17,10 @@ export default async function CandidatesPage({ searchParams }: Props) {
     position: typeof params.position === 'string' ? params.position : undefined,
     job_opening: typeof params.job_opening === 'string' ? params.job_opening : undefined,
     domain: typeof params.domain === 'string' ? params.domain : undefined,
+    location: typeof params.location === 'string' ? params.location : undefined,
+    min_exp: typeof params.min_exp === 'string' ? params.min_exp : undefined,
+    max_exp: typeof params.max_exp === 'string' ? params.max_exp : undefined,
+    relocate: typeof params.relocate === 'string' ? params.relocate : undefined,
   };
 
   // Fetch all candidates from Supabase with filters

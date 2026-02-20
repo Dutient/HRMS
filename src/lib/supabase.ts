@@ -14,9 +14,9 @@ const isValidUrl = (url: string) => {
   }
 };
 
-export const isSupabaseConfigured = 
-  isValidUrl(supabaseUrl) && 
-  supabaseAnonKey.length > 0 && 
+export const isSupabaseConfigured =
+  isValidUrl(supabaseUrl) &&
+  supabaseAnonKey.length > 0 &&
   !supabaseUrl.includes("your-project-url-here");
 
 // Create a single supabase client for interacting with the database
@@ -38,19 +38,21 @@ export interface Candidate {
   experience: number | null;
   skills: string[];
   status:
-    | "New"
-    | "Screening"
-    | "Interview"
-    | "Final Round"
-    | "Selected"
-    | "Rejected"
-    | "Talent Pool";
+  | "New"
+  | "Screening"
+  | "Interview"
+  | "Final Round"
+  | "Selected"
+  | "Rejected"
+  | "Talent Pool";
   source: string | null;
   applied_date: string;
   match_score: number | null;
   summary: string | null;
   resume_url: string | null;
-  availability: string | null;
+  // New filtered fields
+  will_relocate: boolean | null;
+  source_url: string | null;
   // New metadata fields
   position?: string | null;
   job_opening?: string | null;

@@ -14,6 +14,10 @@ export async function getCandidates(
     position?: string;
     job_opening?: string;
     domain?: string;
+    location?: string;
+    min_exp?: string;
+    max_exp?: string;
+    relocate?: string;
   }
 ): Promise<Candidate[]> {
   // Return empty array if Supabase is not configured
@@ -44,6 +48,18 @@ export async function getCandidates(
     }
     if (filters?.domain) {
       query = query.ilike("domain", `%${filters.domain}%`);
+    }
+    if (filters?.location) {
+      query = query.ilike("location", `%${filters.location}%`);
+    }
+    if (filters?.min_exp) {
+      query = query.gte("experience", Number(filters.min_exp));
+    }
+    if (filters?.max_exp) {
+      query = query.lte("experience", Number(filters.max_exp));
+    }
+    if (filters?.relocate === "true") {
+      query = query.eq("will_relocate", true);
     }
 
     const { data, error } = await query;

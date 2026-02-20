@@ -4,13 +4,15 @@ import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X, Loader2, Briefcase, Hash, Globe, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, Briefcase, Hash, Globe, CheckCircle2, HardDrive } from "lucide-react";
 import { useUpload } from "@/context/UploadContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { openGooglePicker } from "@/lib/google-picker";
+import { processDriveFile } from "@/app/actions/process-drive-file";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -19,6 +21,7 @@ interface FileWithPreview extends File {
 export function BulkUploadZone() {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDriveImporting, setIsDriveImporting] = useState(false);
   const { startUpload, isUploading, progress, uploadedCount, totalCount, filesQueue, cancelUpload } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
@@ -27,6 +30,59 @@ export function BulkUploadZone() {
   const [position, setPosition] = useState("");
   const [jobOpening, setJobOpening] = useState("");
   const [domain, setDomain] = useState("");
+
+  // ── Google Drive Import ──────────────────────────────────────────────────
+  const handleDriveImport = useCallback(async () => {
+    try {
+      setIsDriveImporting(true);
+      const result = await openGooglePicker();
+      if (!result) {
+        // User cancelled
+        return;
+      }
+
+      toast({
+        title: `Processing ${result.files.length} file(s) from Drive`,
+        description: "Downloading and extracting resume data...",
+      });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const file of result.files) {
+        const res = await processDriveFile(file, result.accessToken, {
+          position: position || undefined,
+          job_opening: jobOpening || undefined,
+          domain: domain || undefined,
+        });
+        if (res.success) {
+          successCount++;
+        } else {
+          errorCount++;
+          console.error(`Drive import failed for ${file.name}:`, res.message);
+        }
+      }
+
+      toast({
+        title: "Drive Import Complete",
+        description: `${successCount} succeeded, ${errorCount} failed.`,
+        variant: errorCount > 0 ? "destructive" : "default",
+      });
+
+      if (successCount > 0) {
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Google Drive import error:", err);
+      toast({
+        title: "Drive Import Failed",
+        description: err instanceof Error ? err.message : "Could not open Google Drive Picker.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDriveImporting(false);
+    }
+  }, [position, jobOpening, domain, toast, router]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -188,13 +244,31 @@ export function BulkUploadZone() {
             </p>
 
             {!isUploading && (
-              <Button
-                onClick={() => document.getElementById("file-upload")?.click()}
-                className="bg-accent hover:bg-accent-hover"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Select Files
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => document.getElementById("file-upload")?.click()}
+                  className="bg-accent hover:bg-accent-hover"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Select Files
+                </Button>
+
+                <span className="text-text-muted text-sm">or</span>
+
+                <Button
+                  variant="outline"
+                  onClick={handleDriveImport}
+                  disabled={isDriveImporting}
+                  className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-400"
+                >
+                  {isDriveImporting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <HardDrive className="mr-2 h-4 w-4" />
+                  )}
+                  Import from Google Drive
+                </Button>
+              </div>
             )}
           </div>
         </CardContent>
