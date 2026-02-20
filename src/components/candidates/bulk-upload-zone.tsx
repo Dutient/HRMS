@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, X, Loader2, Briefcase, Hash, Globe, CheckCircle2, HardDrive } from "lucide-react";
+import { Upload, FileText, X, Loader2, Briefcase, Hash, Globe, CheckCircle2, HardDrive, FileSpreadsheet } from "lucide-react";
 import { useUpload } from "@/context/UploadContext";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { openGooglePicker } from "@/lib/google-picker";
 import { processDriveFile } from "@/app/actions/process-drive-file";
+import { parseSpreadsheet, processSingleRow } from "@/app/actions/process-spreadsheet";
 
 interface FileWithPreview extends File {
   preview?: string;
@@ -22,6 +23,7 @@ export function BulkUploadZone() {
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isDriveImporting, setIsDriveImporting] = useState(false);
+  const [isSpreadsheetProcessing, setIsSpreadsheetProcessing] = useState(false);
   const { startUpload, isUploading, progress, uploadedCount, totalCount, filesQueue, cancelUpload } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
@@ -82,6 +84,105 @@ export function BulkUploadZone() {
     } finally {
       setIsDriveImporting(false);
     }
+  }, [position, jobOpening, domain, toast, router]);
+
+  // ── Spreadsheet (CSV/XLSX) Import ──────────────────────────────────────
+  const handleSpreadsheetUpload = useCallback(async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv,.xlsx,.xls";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      setIsSpreadsheetProcessing(true);
+      toast({
+        title: `Reading ${file.name}...`,
+        description: "Parsing spreadsheet data.",
+      });
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Step 1: Parse (Server Action, fast)
+        const parseResult = await parseSpreadsheet(formData);
+
+        if (!parseResult.success) {
+          throw new Error(parseResult.message || "Failed to parse spreadsheet");
+        }
+
+        const rows = parseResult.rows;
+        const total = rows.length;
+
+        toast({
+          title: `Found ${total} candidates`,
+          description: "Starting import...",
+        });
+
+        // Step 2: Process Loop (Client Orchestration)
+        let success = 0;
+        let failed = 0;
+
+        for (let i = 0; i < total; i++) {
+          const row = rows[i];
+
+          try {
+            const result = await processSingleRow(row, {
+              position: position || undefined,
+              job_opening: jobOpening || undefined,
+              domain: domain || undefined,
+            });
+
+            if (result.success) {
+              success++;
+            } else {
+              failed++;
+              console.warn(`Row ${i + 2} failed:`, result.message);
+            }
+          } catch (err) {
+            failed++;
+            console.error(`Row ${i + 2} error:`, err);
+          }
+
+          // Update progress bar
+          // We can't use useUpload's setProgress directly as it's not exposed, 
+          // but calling startUpload again resets it. 
+          // Actually, useUpload exposes `progress` state but not a setter.
+          // Since I can't easily hook into useUpload's internal state without modifying the context,
+          // I'll show progress via toast updates every 5 rows or use a local progress approach if needed.
+          // Ideally, I should expose setProgress in context, but for now, let's just use toast updates.
+
+          if ((i + 1) % 5 === 0 || i === total - 1) {
+            toast({
+              title: "Importing...",
+              description: `Processed ${i + 1} of ${total} candidates`,
+            });
+          }
+        }
+
+        toast({
+          title: `Import Complete`,
+          description: `${success} imported successfully. ${failed} failed.`,
+          variant: failed > 0 ? "destructive" : "default",
+        });
+
+        if (success > 0) {
+          router.refresh();
+        }
+
+      } catch (err) {
+        toast({
+          title: "Import Failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSpreadsheetProcessing(false);
+        // Reset/Finish upload context if I could, but it's fine.
+      }
+    };
+    input.click();
   }, [position, jobOpening, domain, toast, router]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -240,7 +341,7 @@ export function BulkUploadZone() {
             </h3>
 
             <p className="text-text-muted mb-6">
-              Maximum 50 files • PDF format only
+              PDF resumes (max 50) • CSV/Excel spreadsheets with candidate data
             </p>
 
             {!isUploading && (
@@ -267,6 +368,22 @@ export function BulkUploadZone() {
                     <HardDrive className="mr-2 h-4 w-4" />
                   )}
                   Import from Google Drive
+                </Button>
+
+                <span className="text-text-muted text-sm">or</span>
+
+                <Button
+                  variant="outline"
+                  onClick={handleSpreadsheetUpload}
+                  disabled={isSpreadsheetProcessing}
+                  className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-400"
+                >
+                  {isSpreadsheetProcessing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  )}
+                  Upload Spreadsheet
                 </Button>
               </div>
             )}

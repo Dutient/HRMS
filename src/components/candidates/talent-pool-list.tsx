@@ -144,12 +144,7 @@ export function TalentPoolList({ candidates }: TalentPoolListProps) {
                           {candidate.experience} years
                         </div>
                       )}
-                      {candidate.availability && (
-                        <div className="flex items-center gap-1.5 text-success">
-                          <Calendar className="h-4 w-4" />
-                          {candidate.availability}
-                        </div>
-                      )}
+
                     </div>
 
                     {candidate.skills && candidate.skills.length > 0 && (

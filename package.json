@@ -33,7 +33,8 @@
     "react-day-picker": "^9.13.1",
     "react-dom": "19.2.3",
     "react-dropzone": "^15.0.0",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
