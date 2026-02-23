@@ -16,6 +16,10 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const APP_ID = process.env.NEXT_PUBLIC_GOOGLE_APP_ID ?? "";
 const SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
+if (!API_KEY || !CLIENT_ID) {
+    console.warn("[GooglePicker] Missing essential environment variables: API_KEY or CLIENT_ID");
+}
+
 // ────────────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────────────
@@ -55,9 +59,11 @@ function loadScript(src: string): Promise<void> {
 
 async function ensureGapiLoaded(): Promise<void> {
     if (gapiLoaded) return;
+    console.log("[GooglePicker] Loading gapi script...");
     await loadScript("https://apis.google.com/js/api.js");
     await new Promise<void>((resolve) =>
         (window as any).gapi.load("picker", () => {
+            console.log("[GooglePicker] gapi picker loaded");
             pickerLoaded = true;
             resolve();
         })
@@ -66,7 +72,9 @@ async function ensureGapiLoaded(): Promise<void> {
 }
 
 async function ensureGsiLoaded(): Promise<void> {
+    console.log("[GooglePicker] Loading GSI script...");
     await loadScript("https://accounts.google.com/gsi/client");
+    console.log("[GooglePicker] GSI script loaded");
 }
 
 // ────────────────────────────────────────────────────────────────────────────────
@@ -76,23 +84,38 @@ function requestAccessToken(): Promise<string> {
     return new Promise((resolve, reject) => {
         const google = (window as any).google;
         if (!google?.accounts?.oauth2) {
-            reject(new Error("Google Identity Services not loaded"));
+            console.error("[GooglePicker] Google Identity Services (GSI) not loaded");
+            reject(new Error("Google Identity Services not loaded. This can happen if scripts are blocked or failed to load."));
             return;
         }
 
+        console.log("[GooglePicker] Initializing token client with Client ID:", CLIENT_ID);
         const tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPE,
             callback: (response: any) => {
+                console.log("[GooglePicker] Token response received:", response);
                 if (response.error) {
-                    reject(new Error(response.error_description || response.error));
+                    const errMsg = response.error_description || response.error;
+                    console.error("[GooglePicker] OAuth Error:", errMsg);
+                    reject(new Error(`OAuth Error: ${errMsg}`));
+                    return;
+                }
+                if (!response.access_token) {
+                    console.error("[GooglePicker] No access token in response");
+                    reject(new Error("Failed to acquire access token from Google."));
                     return;
                 }
                 resolve(response.access_token as string);
             },
+            error_callback: (err: any) => {
+                console.error("[GooglePicker] GSI Initialization Error:", err);
+                reject(new Error(`GSI Initialization Error: ${err.message || JSON.stringify(err)}`));
+            }
         });
 
         // This opens the Google OAuth consent popup
+        console.log("[GooglePicker] Requesting access token...");
         tokenClient.requestAccessToken({ prompt: "consent" });
     });
 }
@@ -106,10 +129,12 @@ function showPicker(accessToken: string): Promise<PickedFile[]> {
         const gapi = (window as any).gapi;
 
         if (!google?.picker || !gapi) {
+            console.error("[GooglePicker] Google Picker SDK not available during showPicker");
             reject(new Error("Google Picker not available"));
             return;
         }
 
+        console.log("[GooglePicker] Building Picker dialog...");
         // Allow PDFs and Google Sheets
         const docsView = new google.picker.DocsView()
             .setIncludeFolders(true)
@@ -118,29 +143,42 @@ function showPicker(accessToken: string): Promise<PickedFile[]> {
             )
             .setSelectFolderEnabled(false);
 
-        const picker = new google.picker.PickerBuilder()
-            .addView(docsView)
-            .setOAuthToken(accessToken)
-            .setDeveloperKey(API_KEY)
-            .setAppId(APP_ID)
-            .setCallback((data: any) => {
-                if (data.action === google.picker.Action.PICKED) {
-                    const files: PickedFile[] = data.docs.map((doc: any) => ({
-                        id: doc.id,
-                        name: doc.name,
-                        mimeType: doc.mimeType,
-                        url: doc.url,
-                    }));
-                    resolve(files);
-                } else if (data.action === google.picker.Action.CANCEL) {
-                    resolve([]); // user cancelled
-                }
-            })
-            .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-            .setTitle("Select Resumes from Google Drive")
-            .build();
+        try {
+            const picker = new google.picker.PickerBuilder()
+                .addView(docsView)
+                .setOAuthToken(accessToken)
+                .setDeveloperKey(API_KEY)
+                .setAppId(APP_ID)
+                .setCallback((data: any) => {
+                    console.log("[GooglePicker] Raw Callback Data:", data);
 
-        picker.setVisible(true);
+                    if (data.action === google.picker.Action.PICKED) {
+                        const files: PickedFile[] = data.docs.map((doc: any) => ({
+                            id: doc.id,
+                            name: doc.name,
+                            mimeType: doc.mimeType,
+                            url: doc.url,
+                        }));
+                        console.log(`[GooglePicker] User picked ${files.length} files`);
+                        resolve(files);
+                    } else if (data.action === google.picker.Action.CANCEL) {
+                        console.log("[GooglePicker] User cancelled picker");
+                        resolve([]); // user cancelled
+                    } else if (data.error) {
+                        console.error("[GooglePicker] Picker Error Data:", data.error);
+                        reject(new Error(`Picker Error: ${data.error}`));
+                    }
+                })
+                .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                .setTitle("Select Resumes from Google Drive")
+                .build();
+
+            picker.setVisible(true);
+            console.log("[GooglePicker] Picker dialog visible");
+        } catch (err) {
+            console.error("[GooglePicker] Error building/showing picker:", err);
+            reject(err);
+        }
     });
 }
 

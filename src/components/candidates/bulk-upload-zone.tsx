@@ -93,7 +93,7 @@ export function BulkUploadZone() {
       }
 
       toast({
-        title: "Drive Import Complete",
+        title: successCount > 0 ? "Drive Import Complete" : "Drive Import Failed",
         description: `${successCount} succeeded, ${errorCount} failed.`,
         variant: errorCount > 0 ? "destructive" : "default",
       });
@@ -102,10 +102,26 @@ export function BulkUploadZone() {
         router.refresh();
       }
     } catch (err) {
-      console.error("Google Drive import error:", err);
+      console.error("[BulkUploadZone] Google Drive import error:", err);
+
+      let errorTitle = "Drive Picker Error";
+      let errorDescription = err instanceof Error ? err.message : "Could not open Google Drive Picker.";
+
+      // Specific handling for common Google API errors to help the user
+      if (errorDescription.includes("origin")) {
+        errorTitle = "Security Error (Origin Mismatch)";
+        errorDescription = "This domain is not authorized in your Google Cloud Console. Please add your production URL to 'Authorized JavaScript origins'.";
+      } else if (errorDescription.includes("idpiframe_initialization_failed")) {
+        errorTitle = "Browser Blocked Initialization";
+        errorDescription = "Initialization failed. This usually happens due to third-party cookies being blocked or an unauthorized origin.";
+      } else if (errorDescription.includes("popup_closed_by_user")) {
+        errorTitle = "Login Cancelled";
+        errorDescription = "The Google login popup was closed before completion.";
+      }
+
       toast({
-        title: "Drive Import Failed",
-        description: err instanceof Error ? err.message : "Could not open Google Drive Picker.",
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {

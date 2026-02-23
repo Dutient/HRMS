@@ -37,6 +37,8 @@ export async function processDriveFile(
     metadata?: { position?: string; job_opening?: string; domain?: string }
 ): Promise<ProcessDriveResult> {
     try {
+        console.log(`[processDriveFile] Processing file: ${file.name} (ID: ${file.id}, Type: ${file.mimeType})`);
+
         let downloadUrl: string;
         let fileName = file.name;
 
@@ -45,28 +47,33 @@ export async function processDriveFile(
             // Export Sheet as PDF
             downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=application/pdf`;
             fileName = file.name.replace(/\.[^.]+$/, "") + ".pdf";
+            console.log("[processDriveFile] Exporting Google Sheet to PDF...");
         } else if (file.mimeType === "application/vnd.google-apps.document") {
             // Export Doc as PDF
             downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=application/pdf`;
             fileName = file.name.replace(/\.[^.]+$/, "") + ".pdf";
+            console.log("[processDriveFile] Exporting Google Doc to PDF...");
         } else {
             // Standard binary download (PDF, DOCX, etc.)
             downloadUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+            console.log("[processDriveFile] Downloading standard file...");
         }
 
+        console.log(`[processDriveFile] Fetching from Google: ${downloadUrl.split('?')[0]}`);
         const response = await fetch(downloadUrl, {
             headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error("Drive download failed:", errorText);
+            console.error(`[processDriveFile] Google Drive API error (${response.status}):`, errorText);
             return {
                 success: false,
-                message: `Failed to download from Drive: ${response.status}`,
+                message: `Failed to download from Drive: ${response.status} ${response.statusText}`,
             };
         }
 
+        console.log("[processDriveFile] Download successful, converting to buffer...");
         // Convert response to a File-like object for our existing pipeline
         const arrayBuffer = await response.arrayBuffer();
         const blob = new Blob([arrayBuffer], { type: "application/pdf" });
