@@ -21,36 +21,39 @@ export async function deleteCandidate(candidateId: string): Promise<{ success: b
             return { success: false, message: "Candidate not found" };
         }
 
-        // 2. Delete resume file from storage if it exists
+        // 2. Prepare parallel deletion tasks
+        const deleteTasks: any[] = [];
+
+        // Task A: Delete resume file from storage if it exists
         if (candidate?.resume_url) {
-            // Extract path from URL
-            // URL format: .../storage/v1/object/public/resumes/filename.pdf
-            // We need just "filename.pdf" or the path inside the bucket
             const url = new URL(candidate.resume_url);
             const pathParts = url.pathname.split("/resumes/");
             if (pathParts.length > 1) {
                 const filePath = pathParts[1];
-                const { error: storageError } = await supabase.storage
-                    .from("resumes")
-                    .remove([decodeURIComponent(filePath)]);
-
-                if (storageError) {
-                    console.warn("Error deleting resume file:", storageError);
-                    // Continue to delete record even if file deletion fails
-                }
+                deleteTasks.push(
+                    supabase.storage
+                        .from("resumes")
+                        .remove([decodeURIComponent(filePath)])
+                        .then(({ error }) => {
+                            if (error) console.warn("Error deleting resume file:", error);
+                        })
+                );
             }
         }
 
-        // 3. Delete candidate record
-        const { error: deleteError } = await supabase
-            .from("candidates")
-            .delete()
-            .eq("id", candidateId);
+        // Task B: Delete candidate record
+        deleteTasks.push(
+            supabase
+                .from("candidates")
+                .delete()
+                .eq("id", candidateId)
+                .then(({ error }) => {
+                    if (error) throw new Error(`Database error: ${error.message}`);
+                })
+        );
 
-        if (deleteError) {
-            console.error("Error deleting candidate record:", deleteError);
-            return { success: false, message: "Failed to delete candidate record" };
-        }
+        // 3. Execute all deletions in parallel
+        await Promise.all(deleteTasks);
 
         revalidatePath("/candidates");
         return { success: true, message: "Candidate deleted successfully" };

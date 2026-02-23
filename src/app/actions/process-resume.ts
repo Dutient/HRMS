@@ -7,7 +7,7 @@ import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExtractedData {
+export interface ExtractedData {
   name: string;
   email: string;
   phone: string | null;
@@ -15,6 +15,8 @@ interface ExtractedData {
   experience: number;
   skills: string[];
   summary: string;
+  current_location: string | null;
+  is_willing_to_relocate: boolean | null;
 }
 
 // Fields the LLM extracts (email + phone are handled by regex)
@@ -24,6 +26,8 @@ interface LLMExtractedData {
   experience: number;
   skills: string[];
   summary: string;
+  current_location: string | null;
+  is_willing_to_relocate: boolean | null;
 }
 
 // ─── Text Extraction Helpers ───────────────────────────────────────────────────
@@ -136,11 +140,13 @@ ${truncatedText}
 
 Return this exact JSON schema:
 {
-  "name": "full name",
+    "name": "full name",
   "role": "inferred job title or role",
   "experience": <integer years>,
   "skills": ["skill1", "skill2"],
-  "summary": "one sentence professional summary"
+  "summary": "one sentence professional summary",
+  "current_location": "City, Country or null if not found",
+  "is_willing_to_relocate": boolean (true if mentions relocation/travel/remote, else false)
 }`;
 
   // Nova Micro uses the Converse-style messages API
@@ -201,6 +207,8 @@ Return this exact JSON schema:
       summary: llmData.summary ?? "",
       email: regexEmail ?? "",   // falls back to empty string; DB insert will fail gracefully if truly missing
       phone: regexPhone ?? null,
+      current_location: llmData.current_location ?? null,
+      is_willing_to_relocate: llmData.is_willing_to_relocate ?? false,
     };
 
     if (!merged.email) {
@@ -320,6 +328,8 @@ export async function processResume(formData: FormData): Promise<{
       source: "Bulk Upload",
       match_score: null,
       applied_date: new Date().toISOString().split("T")[0],
+      location: extractedData.current_location,
+      will_relocate: extractedData.is_willing_to_relocate,
     });
 
     if (error) {

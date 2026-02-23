@@ -2,10 +2,12 @@
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import type { ExtractedData } from "./process-resume";
 
 interface UploadResult {
   fileName: string;
   success: boolean;
+  candidateId?: string;
   candidateName?: string;
   message?: string;
 }
@@ -22,6 +24,9 @@ export async function uploadResumesAndCreateCandidates(
     position?: string;
     job_opening?: string;
     domain?: string;
+    source_url?: string;
+    name?: string;
+    email?: string;
   }
 ): Promise<UploadResult> {
   // Check if Supabase is configured
@@ -110,21 +115,33 @@ export async function uploadResumesAndCreateCandidates(
       };
     }
 
-    // Step D: Use Bedrock (Claude 4.5 Haiku) to parse resume and extract candidate fields
-    let extractedData;
+    // Step D: Use Bedrock (Nova Micro) to parse resume and extract candidate fields
+    let extractedData: ExtractedData | null = null;
     try {
       extractedData = await extractDataWithBedrock(resumeText);
-      if (!extractedData) {
+      if (!extractedData && (!metadata?.name || !metadata?.email)) {
         throw new Error("Missing required fields (Name or Email)");
       }
     } catch (err) {
       console.error(`❌ Bedrock extraction failed:`, err);
-      // Cleanup uploaded file
-      await supabase.storage.from("resumes").remove([uploadData.path]);
+      // Only fail if we don't have metadata fallbacks
+      if (!metadata?.name || !metadata?.email) {
+        await supabase.storage.from("resumes").remove([uploadData.path]);
+        return {
+          fileName: file.name,
+          success: false,
+          message: err instanceof Error ? err.message : "Bedrock extraction failed",
+        };
+      }
+      console.log("⚠️ Continuing with spreadsheet metadata overrides despite extraction failure");
+      extractedData = { name: metadata.name, email: metadata.email, role: "General Application", phone: null, experience: 0, skills: [], summary: "", current_location: null, is_willing_to_relocate: false };
+    }
+
+    if (!extractedData) {
       return {
         fileName: file.name,
         success: false,
-        message: err instanceof Error ? err.message : "Bedrock extraction failed",
+        message: "Failed to process candidate data",
       };
     }
 
@@ -153,8 +170,8 @@ export async function uploadResumesAndCreateCandidates(
     const { data: candidateData, error: insertError } = await supabase
       .from("candidates")
       .insert({
-        name: extractedData.name,
-        email: extractedData.email,
+        name: metadata?.name || extractedData.name,
+        email: metadata?.email || extractedData.email,
         phone: extractedData.phone,
         resume_text: resumeText, // Ensure text is stored!
         role: extractedData.role || "General Application", // Default per requirement
@@ -171,6 +188,7 @@ export async function uploadResumesAndCreateCandidates(
         position: metadata?.position || null,
         job_opening: metadata?.job_opening || null,
         domain: metadata?.domain || null,
+        source_url: metadata?.source_url || null,
       })
       .select()
       .single();
@@ -199,6 +217,7 @@ export async function uploadResumesAndCreateCandidates(
     return {
       fileName: file.name,
       success: true,
+      candidateId: candidateData.id,
       candidateName: candidateData.name,
     };
 
