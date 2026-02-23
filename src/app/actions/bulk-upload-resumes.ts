@@ -166,10 +166,10 @@ export async function uploadResumesAndCreateCandidates(
       vectorElement = null;
     }
 
-    // Step E: Insert candidate record with all fields
+    // Step E: Upsert candidate record (Merge by Email)
     const { data: candidateData, error: insertError } = await supabase
       .from("candidates")
-      .insert({
+      .upsert({
         name: metadata?.name || extractedData.name,
         email: metadata?.email || extractedData.email,
         phone: extractedData.phone,
@@ -189,6 +189,9 @@ export async function uploadResumesAndCreateCandidates(
         job_opening: metadata?.job_opening || null,
         domain: metadata?.domain || null,
         source_url: metadata?.source_url || null,
+      }, {
+        onConflict: 'email',
+        ignoreDuplicates: false // We want to update existing records
       })
       .select()
       .single();

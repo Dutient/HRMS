@@ -209,9 +209,9 @@ export async function processSingleRow(
             }
         }
 
-        // Path B: Direct Insert
+        // Path B: Direct Upsert (Merge by Email)
         const skillsArray = row.skills ? row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean) : [];
-        const { error } = await supabase.from("candidates").insert({
+        const { error } = await supabase.from("candidates").upsert({
             name: row.name || "Unknown",
             email: row.email || null,
             phone: row.phone || null,
@@ -225,6 +225,9 @@ export async function processSingleRow(
             position: metadata?.position || null,
             job_opening: metadata?.job_opening || null,
             domain: metadata?.domain || null,
+        }, {
+            onConflict: 'email',
+            ignoreDuplicates: false
         });
 
         if (error) throw new Error(error.message);
