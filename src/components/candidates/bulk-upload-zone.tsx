@@ -24,7 +24,20 @@ export function BulkUploadZone() {
   const [isDragging, setIsDragging] = useState(false);
   const [isDriveImporting, setIsDriveImporting] = useState(false);
   const [isSpreadsheetProcessing, setIsSpreadsheetProcessing] = useState(false);
-  const { startUpload, isUploading, progress, uploadedCount, totalCount, filesQueue, cancelUpload } = useUpload();
+  const {
+    startUpload,
+    isUploading,
+    progress,
+    uploadedCount,
+    totalCount,
+    filesQueue,
+    cancelUpload,
+    setIsUploading,
+    setProgress,
+    setUploadedCount,
+    setTotalCount,
+    setFilesQueue
+  } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -36,12 +49,15 @@ export function BulkUploadZone() {
   // ── Google Drive Import ──────────────────────────────────────────────────
   const handleDriveImport = useCallback(async () => {
     try {
-      setIsDriveImporting(true);
       const result = await openGooglePicker();
-      if (!result) {
-        // User cancelled
-        return;
-      }
+      if (!result) return;
+
+      setIsDriveImporting(true);
+      setIsUploading(true);
+      setTotalCount(result.files.length);
+      setUploadedCount(0);
+      setProgress(0);
+      setFilesQueue(result.files.map(f => ({ name: f.name, status: "pending" })));
 
       toast({
         title: `Processing ${result.files.length} file(s) from Drive`,
@@ -51,18 +67,29 @@ export function BulkUploadZone() {
       let successCount = 0;
       let errorCount = 0;
 
-      for (const file of result.files) {
+      for (let i = 0; i < result.files.length; i++) {
+        const file = result.files[i];
+
+        setFilesQueue(prev => prev.map((f, idx) => idx === i ? { ...f, status: "processing" } : f));
+
         const res = await processDriveFile(file, result.accessToken, {
           position: position || undefined,
           job_opening: jobOpening || undefined,
           domain: domain || undefined,
         });
+
         if (res.success) {
           successCount++;
+          setFilesQueue(prev => prev.map((f, idx) => idx === i ? { ...f, status: "success", candidateName: res.candidateName } : f));
         } else {
           errorCount++;
+          setFilesQueue(prev => prev.map((f, idx) => idx === i ? { ...f, status: "error", message: res.message } : f));
           console.error(`Drive import failed for ${file.name}:`, res.message);
         }
+
+        const completed = i + 1;
+        setUploadedCount(completed);
+        setProgress(Math.round((completed / result.files.length) * 100));
       }
 
       toast({
@@ -83,8 +110,9 @@ export function BulkUploadZone() {
       });
     } finally {
       setIsDriveImporting(false);
+      setIsUploading(false);
     }
-  }, [position, jobOpening, domain, toast, router]);
+  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue]);
 
   // ── Spreadsheet (CSV/XLSX) Import ──────────────────────────────────────
   const handleSpreadsheetUpload = useCallback(async () => {
@@ -105,7 +133,6 @@ export function BulkUploadZone() {
         const formData = new FormData();
         formData.append("file", file);
 
-        // Step 1: Parse (Server Action, fast)
         const parseResult = await parseSpreadsheet(formData);
 
         if (!parseResult.success) {
@@ -115,49 +142,70 @@ export function BulkUploadZone() {
         const rows = parseResult.rows;
         const total = rows.length;
 
+        setIsUploading(true);
+        setTotalCount(total);
+        setUploadedCount(0);
+        setProgress(0);
+        setFilesQueue(rows.map(row => ({ name: row.name || row.email || "Candidate", status: "pending" })));
+
         toast({
           title: `Found ${total} candidates`,
-          description: "Starting import...",
+          description: "Starting import in batches of 50...",
         });
 
-        // Step 2: Process Loop (Client Orchestration)
         let success = 0;
         let failed = 0;
+        const SPREADSHEET_BATCH_SIZE = 50;
 
-        for (let i = 0; i < total; i++) {
-          const row = rows[i];
+        for (let i = 0; i < total; i += SPREADSHEET_BATCH_SIZE) {
+          const batch = rows.slice(i, i + SPREADSHEET_BATCH_SIZE);
+          const batchIndices = batch.map((_, idx) => i + idx);
 
-          try {
-            const result = await processSingleRow(row, {
-              position: position || undefined,
-              job_opening: jobOpening || undefined,
-              domain: domain || undefined,
-            });
+          setFilesQueue(prev => prev.map((f, idx) => batchIndices.includes(idx) ? { ...f, status: "processing" } : f));
 
-            if (result.success) {
+          const batchPromises = batch.map(async (row, localIdx) => {
+            const globalIdx = i + localIdx;
+            try {
+              const res = await processSingleRow(row, {
+                position: position || undefined,
+                job_opening: jobOpening || undefined,
+                domain: domain || undefined,
+              });
+              return { globalIdx, res };
+            } catch (err) {
+              return { globalIdx, res: { success: false, message: err instanceof Error ? err.message : "Unknown error" } };
+            }
+          });
+
+          const results = await Promise.all(batchPromises);
+
+          for (const { globalIdx, res } of results) {
+            if (res.success) {
               success++;
+              setFilesQueue(prev => {
+                const updated = [...prev];
+                updated[globalIdx] = { ...updated[globalIdx], status: "success", candidateName: res.candidateName };
+                return updated;
+              });
             } else {
               failed++;
-              console.warn(`Row ${i + 2} failed:`, result.message);
+              setFilesQueue(prev => {
+                const updated = [...prev];
+                updated[globalIdx] = { ...updated[globalIdx], status: "error", message: res.message };
+                return updated;
+              });
             }
-          } catch (err) {
-            failed++;
-            console.error(`Row ${i + 2} error:`, err);
           }
 
-          // Update progress bar
-          // We can't use useUpload's setProgress directly as it's not exposed, 
-          // but calling startUpload again resets it. 
-          // Actually, useUpload exposes `progress` state but not a setter.
-          // Since I can't easily hook into useUpload's internal state without modifying the context,
-          // I'll show progress via toast updates every 5 rows or use a local progress approach if needed.
-          // Ideally, I should expose setProgress in context, but for now, let's just use toast updates.
+          const completed = Math.min(i + SPREADSHEET_BATCH_SIZE, total);
+          setUploadedCount(completed);
+          setProgress(Math.round((completed / total) * 100));
 
-          if ((i + 1) % 5 === 0 || i === total - 1) {
-            toast({
-              title: "Importing...",
-              description: `Processed ${i + 1} of ${total} candidates`,
-            });
+          // If any row in the batch had a resume URL, it likely used Bedrock.
+          // Add a small delay to prevent rapid-fire 429s if many have URLs.
+          const hasResumeUrls = batch.some(r => r.resumeUrl);
+          if (hasResumeUrls && completed < total) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         }
 
@@ -179,11 +227,11 @@ export function BulkUploadZone() {
         });
       } finally {
         setIsSpreadsheetProcessing(false);
-        // Reset/Finish upload context if I could, but it's fine.
+        setIsUploading(false);
       }
     };
     input.click();
-  }, [position, jobOpening, domain, toast, router]);
+  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -345,46 +393,55 @@ export function BulkUploadZone() {
             </p>
 
             {!isUploading && (
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={() => document.getElementById("file-upload")?.click()}
-                  className="bg-accent hover:bg-accent-hover"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Select Files
-                </Button>
+              <div className="flex flex-col items-center gap-6">
+                <div className="flex items-center gap-4 flex-wrap justify-center">
+                  <Button
+                    onClick={() => document.getElementById("file-upload")?.click()}
+                    variant="outline"
+                    className="h-12 px-6"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Drop PDFs
+                  </Button>
 
-                <span className="text-text-muted text-sm">or</span>
+                  <div className="relative group">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                      <Badge className="bg-emerald-500 hover:bg-emerald-600 border-none text-[10px] px-2 py-0 h-5 shadow-sm">
+                        RECOMMENDED FOR AI RANKING
+                      </Badge>
+                    </div>
+                    <Button
+                      onClick={handleDriveImport}
+                      disabled={isDriveImporting}
+                      className="h-12 px-8 bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200/50"
+                    >
+                      {isDriveImporting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <HardDrive className="mr-2 h-4 w-4" />
+                      )}
+                      Import from Google Drive
+                    </Button>
+                  </div>
 
-                <Button
-                  variant="outline"
-                  onClick={handleDriveImport}
-                  disabled={isDriveImporting}
-                  className="border-blue-300 text-blue-600 hover:bg-blue-50 hover:border-blue-400"
-                >
-                  {isDriveImporting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <HardDrive className="mr-2 h-4 w-4" />
-                  )}
-                  Import from Google Drive
-                </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSpreadsheetUpload}
+                    disabled={isSpreadsheetProcessing}
+                    className="h-12 px-6 border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+                  >
+                    {isSpreadsheetProcessing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    )}
+                    Upload Spreadsheet
+                  </Button>
+                </div>
 
-                <span className="text-text-muted text-sm">or</span>
-
-                <Button
-                  variant="outline"
-                  onClick={handleSpreadsheetUpload}
-                  disabled={isSpreadsheetProcessing}
-                  className="border-emerald-300 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-400"
-                >
-                  {isSpreadsheetProcessing ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  )}
-                  Upload Spreadsheet
-                </Button>
+                <p className="text-xs text-text-muted max-w-md mx-auto italic">
+                  Tip: Use the <strong>Google Drive</strong> button to pick PDF resumes. Selection via Drive ensures the AI can read full resumes for accurate ranking.
+                </p>
               </div>
             )}
           </div>

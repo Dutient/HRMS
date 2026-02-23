@@ -24,7 +24,6 @@ const nextConfig: NextConfig = {
         "*.netlify.app", // Allow all Netlify preview deployments
       ],
     },
-    proxyClientMaxBodySize: "100mb", // Allow large file uploads through proxy.ts
   },
 };
 

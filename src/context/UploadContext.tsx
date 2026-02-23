@@ -16,6 +16,11 @@ interface UploadContextType {
   uploadedCount: number;
   totalCount: number;
   filesQueue: FileStatus[];
+  setIsUploading: (val: boolean) => void;
+  setProgress: (val: number) => void;
+  setUploadedCount: (val: number) => void;
+  setTotalCount: (val: number) => void;
+  setFilesQueue: React.Dispatch<React.SetStateAction<FileStatus[]>>;
   startUpload: (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => Promise<void>;
   clearQueue: () => void;
   cancelUpload: () => void;
@@ -148,10 +153,15 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     <UploadContext.Provider
       value={{
         isUploading,
+        setIsUploading,
         progress,
+        setProgress,
         uploadedCount,
+        setUploadedCount,
         totalCount,
+        setTotalCount,
         filesQueue,
+        setFilesQueue,
         startUpload,
         clearQueue,
         cancelUpload,

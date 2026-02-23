@@ -1,230 +1,235 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Users, Briefcase, Calendar, TrendingUp, ArrowRight, Plus, Upload } from "lucide-react";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import Link from "next/link";
-import { format } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, FileCheck, TrendingUp } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
-async function getDashboardData() {
-  if (!isSupabaseConfigured || !supabase) {
-    return {
-      totalCandidates: 0,
-      recentCandidates: [],
-    };
+export default async function Home() {
+  const supabase = await createClient();
+  const cookieStore = await cookies();
+  const authToken = cookieStore.get("auth_token");
+
+  if (!authToken || authToken.value !== "authenticated") {
+    redirect("/login");
   }
 
-  // Fetch total candidates count
   const { count: totalCandidates } = await supabase
     .from("candidates")
     .select("*", { count: "exact", head: true });
 
-  // Fetch 5 most recent candidates
+  const { count: selectedCandidates } = await supabase
+    .from("candidates")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "Selected");
+
   const { data: recentCandidates } = await supabase
     .from("candidates")
-    .select("id, name, role, applied_date")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(5);
 
-  return {
-    totalCandidates: totalCandidates || 0,
-    recentCandidates: recentCandidates || [],
-  };
-}
+  const { data: allCandidates } = await supabase
+    .from("candidates")
+    .select("id, position, job_opening, domain, role");
 
-export default async function Home() {
-  const { totalCandidates, recentCandidates } = await getDashboardData();
+  const pipelineGroups: Record<string, {
+    count: number;
+    position: string;
+    jobId: string;
+    domain: string
+  }> = {};
+
+  let unassignedCount = 0;
+
+  allCandidates?.forEach((c) => {
+    if (!c.position && !c.job_opening && !c.domain) {
+      unassignedCount++;
+      return;
+    }
+
+    const position = c.position || "Unknown Position";
+    const jobId = c.job_opening || "No Job ID";
+    const domain = c.domain || "General";
+    const key = `${position}|${jobId}|${domain}`;
+
+    if (!pipelineGroups[key]) {
+      pipelineGroups[key] = { count: 0, position, jobId, domain };
+    }
+    pipelineGroups[key].count++;
+  });
+
+  if (unassignedCount > 0) {
+    pipelineGroups["unassigned"] = {
+      count: unassignedCount,
+      position: "Unassigned Candidates",
+      jobId: "-",
+      domain: "-"
+    };
+  }
+
+  const sortedGroups = Object.values(pipelineGroups).sort((a, b) => b.count - a.count);
+  const topGroups = sortedGroups.slice(0, 5);
+  const selectionRate = totalCandidates ? Math.round(((selectedCandidates || 0) / totalCandidates) * 100) : 0;
+
+  // Pipeline bar colors
+  const barColors = [
+    "bg-accent",
+    "bg-info",
+    "bg-success",
+    "bg-warning",
+    "bg-danger",
+  ];
+
+  // Avatar background colors
+  const avatarColors = [
+    "bg-accent text-primary",
+    "bg-info text-white",
+    "bg-success text-white",
+    "bg-danger text-white",
+    "bg-primary text-accent",
+  ];
 
   return (
-    <div className="space-y-6 md:space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="font-heading text-3xl md:text-4xl font-bold text-primary">
-          Dashboard
-        </h1>
-        <p className="mt-1 md:mt-2 text-base md:text-lg text-text-muted">
-          Overview of your hiring pipeline and key metrics
-        </p>
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-heading font-bold text-primary">Dashboard</h1>
 
-      {/* Metrics Grid - 4 Cards */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Total Candidates (Real Data) */}
-        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#3B82F6" }}>
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs md:text-sm font-medium text-text-muted">
-                  Total Candidates
-                </p>
-                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
-                  {totalCandidates}
-                </p>
-                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-success">
-                  <TrendingUp className="mr-1 h-3 w-3 md:h-4 md:w-4" />
-                  Active pipeline
-                </p>
-              </div>
-              <div
-                className="rounded-full p-2 md:p-3 flex-shrink-0"
-                style={{ backgroundColor: "#3B82F620" }}
-              >
-                <Users className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#3B82F6" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 2: Ready to Deploy */}
-        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#10B981" }}>
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs md:text-sm font-medium text-text-muted">
-                  Ready to Deploy
-                </p>
-                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
-                  0
-                </p>
-                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-text-muted">
-                  Target: 6 minimum
-                </p>
-              </div>
-              <div
-                className="rounded-full p-2 md:p-3 flex-shrink-0"
-                style={{ backgroundColor: "#10B98120" }}
-              >
-                <Briefcase className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#10B981" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Interviews Today */}
-        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#F59E0B" }}>
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs md:text-sm font-medium text-text-muted">
-                  Interviews Today
-                </p>
-                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
-                  0
-                </p>
-                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-text-muted">
-                  No interviews scheduled
-                </p>
-              </div>
-              <div
-                className="rounded-full p-2 md:p-3 flex-shrink-0"
-                style={{ backgroundColor: "#F59E0B20" }}
-              >
-                <Calendar className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#F59E0B" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 4: Selection Rate */}
-        <Card className="relative overflow-hidden border-l-4" style={{ borderLeftColor: "#8B5CF6" }}>
-          <CardContent className="pt-4 md:pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs md:text-sm font-medium text-text-muted">
-                  Selection Rate
-                </p>
-                <p className="mt-1 md:mt-2 font-heading text-2xl md:text-3xl font-extrabold text-primary">
-                  12%
-                </p>
-                <p className="mt-1 md:mt-2 flex items-center text-xs md:text-sm text-success">
-                  <TrendingUp className="mr-1 h-3 w-3 md:h-4 md:w-4" />
-                  Industry average
-                </p>
-              </div>
-              <div
-                className="rounded-full p-2 md:p-3 flex-shrink-0"
-                style={{ backgroundColor: "#8B5CF620" }}
-              >
-                <TrendingUp className="h-5 w-5 md:h-6 md:w-6" style={{ color: "#8B5CF6" }} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Content Grid: Recent Activity + Quick Actions */}
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
-        {/* Recent Activity - Takes 2 columns on larger screens */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-heading text-xl md:text-2xl">Recent Candidates</CardTitle>
-            <CardDescription>Latest additions to your talent pipeline</CardDescription>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="relative overflow-hidden border border-border">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-accent rounded-t-[--radius-md]" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+            <CardTitle className="text-sm font-medium text-text-muted">Total Candidates</CardTitle>
+            <span className="h-9 w-9 rounded-full bg-accent/10 flex items-center justify-center">
+              <Users className="h-4 w-4 text-accent" />
+            </span>
           </CardHeader>
           <CardContent>
-            {recentCandidates.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="mx-auto h-12 w-12 text-text-muted mb-3" />
-                <p className="text-text-muted">No candidates yet</p>
-                <p className="text-sm text-text-muted mt-1">
-                  Start by adding candidates or uploading resumes
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {recentCandidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-background transition-colors"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 font-semibold text-accent text-sm flex-shrink-0">
-                          {candidate.name.split(" ").map((n: string) => n[0]).join("")}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-primary truncate">
-                            {candidate.name}
-                          </p>
-                          <p className="text-sm text-text-muted truncate">{candidate.role}</p>
-                        </div>
+            <div className="text-3xl font-bold text-primary">{totalCandidates || 0}</div>
+            <p className="text-xs text-text-muted mt-1">All candidates in system</p>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border border-border">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-success rounded-t-[--radius-md]" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+            <CardTitle className="text-sm font-medium text-text-muted">Selection Rate</CardTitle>
+            <span className="h-9 w-9 rounded-full bg-success/10 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-success" />
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{selectionRate}%</div>
+            <p className="text-xs text-text-muted mt-1">Based on &apos;Selected&apos; status</p>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border border-border">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-info rounded-t-[--radius-md]" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-5">
+            <CardTitle className="text-sm font-medium text-text-muted">Active Roles</CardTitle>
+            <span className="h-9 w-9 rounded-full bg-info/10 flex items-center justify-center">
+              <FileCheck className="h-4 w-4 text-info" />
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{Object.keys(pipelineGroups).length}</div>
+            <p className="text-xs text-text-muted mt-1">Unique positions in pipeline</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 border border-border">
+          <CardHeader>
+            <CardTitle className="text-primary font-heading">Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentCandidates && recentCandidates.length > 0 ? (
+              <div className="space-y-3">
+                {recentCandidates.map((candidate, i) => (
+                  <div
+                    key={candidate.id}
+                    className="flex items-center justify-between p-3 rounded-[--radius-sm] border border-border hover:border-accent/40 hover:bg-accent/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold ${avatarColors[i % avatarColors.length]}`}>
+                        {candidate.name.charAt(0)}
                       </div>
-                      <div className="text-right flex-shrink-0 ml-4">
-                        <p className="text-xs text-text-muted">
-                          {format(new Date(candidate.applied_date), "MMM dd, yyyy")}
-                        </p>
+                      <div>
+                        <p className="font-semibold text-sm text-primary">{candidate.name}</p>
+                        <p className="text-xs text-text-muted">{candidate.role}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-                <Link href="/candidates">
-                  <Button variant="outline" className="w-full mt-4">
-                    View All Candidates
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </>
+                    <div className="flex items-center gap-3">
+                      {candidate.status && (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${candidate.status === "Selected"
+                            ? "bg-success/10 text-success"
+                            : candidate.status === "Rejected"
+                              ? "bg-danger/10 text-danger"
+                              : candidate.status === "In Review"
+                                ? "bg-info/10 text-info"
+                                : "bg-accent/10 text-accent"
+                          }`}>
+                          {candidate.status}
+                        </span>
+                      )}
+                      <p className="text-xs text-text-muted">
+                        {new Date(candidate.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-text-muted italic">
+                No recent activity to display.
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Quick Actions - Takes 1 column */}
-        <Card>
+        <Card className="col-span-3 border border-border">
           <CardHeader>
-            <CardTitle className="font-heading text-xl md:text-2xl">Quick Actions</CardTitle>
-            <CardDescription>Common recruitment tasks</CardDescription>
+            <CardTitle className="text-primary font-heading">Pipeline Breakdown</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Link href="/candidates">
-              <Button className="w-full bg-accent hover:bg-accent-hover">
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Candidate
-              </Button>
-            </Link>
-            <Link href="/bulk-upload">
-              <Button variant="outline" className="w-full">
-                <Upload className="mr-2 h-4 w-4" />
-                Bulk Upload Resumes
-              </Button>
-            </Link>
+          <CardContent>
+            {sortedGroups.length > 0 ? (
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+                {topGroups.map((group, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-primary truncate max-w-[180px]" title={group.position}>
+                          {group.position}
+                        </span>
+                        {(group.jobId !== "-" || group.domain !== "-") && (
+                          <span className="text-xs text-text-muted truncate max-w-[160px] block">
+                            {group.jobId !== "-" ? group.jobId.replace(/^https?:\/\/(www\.)?/i, "").split("/")[0] + "/…" : ""}{group.domain !== "-" ? ` • ${group.domain}` : ""}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${i === 0 ? "bg-accent/15 text-accent"
+                          : i === 1 ? "bg-info/15 text-info"
+                            : i === 2 ? "bg-success/15 text-success"
+                              : i === 3 ? "bg-warning/15 text-warning"
+                                : "bg-danger/15 text-danger"
+                        }`}>
+                        {group.count}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${barColors[i % barColors.length]}`}
+                        style={{ width: `${(group.count / (totalCandidates || 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[200px] text-text-muted italic">
+                No pipeline data available.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

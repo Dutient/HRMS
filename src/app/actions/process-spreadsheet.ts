@@ -42,7 +42,7 @@ const ALIASES: [string[], keyof SpreadsheetRow][] = [
     [["experience", "exp", "years of experience", "total experience", "yrs", "years", "work experience"], "experience"],
     [["location", "city", "address", "current location", "place"], "location"],
     [["skills", "skill", "key skills", "skillset", "skill set", "technologies"], "skills"],
-    [["resume url", "resume link", "resume", "cv link", "cv url", "drive link", "google drive link", "link"], "resumeUrl"],
+    [["resume url", "resume link", "resume", "cv link", "cv url", "drive link", "google drive link", "link", "submit your resume", "upload resume"], "resumeUrl"],
     [["role", "position", "job title", "designation", "title", "current role"], "role"],
 ];
 
@@ -135,40 +135,77 @@ export async function processSingleRow(
     try {
         // Path A: Resume URL present → Download & AI Extract
         if (row.resumeUrl) {
-            const pdfResponse = await fetch(row.resumeUrl);
-            if (!pdfResponse.ok) throw new Error(`Resume download failed (HTTP ${pdfResponse.status})`);
+            try {
+                console.log(`🔗 Found resume URL: ${row.resumeUrl}`);
 
-            const blob = await pdfResponse.blob();
-            const fileName = `${row.name || "resume"}.pdf`.replace(/[^a-zA-Z0-9.-]/g, "_");
-            const pdfFile = new File([blob], fileName, { type: "application/pdf" });
-
-            const uploadFormData = new FormData();
-            uploadFormData.append("file", pdfFile);
-
-            const uploadResult = await uploadResumesAndCreateCandidates(uploadFormData, {
-                position: metadata?.position,
-                job_opening: metadata?.job_opening,
-                domain: metadata?.domain,
-                source_url: row.resumeUrl,
-            });
-
-            if (uploadResult.success && uploadResult.candidateName) {
-                // Merge spreadsheet data overrides
-                const updateFields: Record<string, unknown> = {};
-                if (row.name) updateFields.name = row.name;
-                if (row.email) updateFields.email = row.email;
-                if (row.phone) updateFields.phone = row.phone;
-                if (row.location) updateFields.location = row.location;
-                if (row.experience) updateFields.experience = row.experience;
-                if (row.role) updateFields.role = row.role;
-                if (row.skills) updateFields.skills = row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean);
-
-                if (Object.keys(updateFields).length > 0) {
-                    await supabase.from("candidates").update(updateFields).eq("name", uploadResult.candidateName);
+                // Helper to handle Google Drive sharing links
+                let finalUrl = row.resumeUrl;
+                if (finalUrl.includes("drive.google.com")) {
+                    const driveIdMatch = finalUrl.match(/\/file\/d\/([^\/]+)/) || finalUrl.match(/id=([^\/&]+)/);
+                    if (driveIdMatch && driveIdMatch[1]) {
+                        // Use the public download endpoint (confirm=t bypasses the "can't scan for viruses" warning for many files)
+                        finalUrl = `https://drive.google.com/uc?export=download&id=${driveIdMatch[1]}&confirm=t`;
+                    }
                 }
-                return { success: true, message: "Imported with resume", candidateName: uploadResult.candidateName };
-            } else {
-                return { success: false, message: uploadResult.message || "Upload failed" };
+
+                const pdfResponse = await fetch(finalUrl);
+                if (!pdfResponse.ok) {
+                    console.warn(`⚠️ Resume download failed for ${displayName} (HTTP ${pdfResponse.status}) from ${finalUrl}. Falling back to direct insert.`);
+                } else {
+                    const contentType = pdfResponse.headers.get("content-type");
+                    if (contentType && contentType.includes("text/html")) {
+                        console.warn(`⚠️ Downloaded content for ${displayName} is HTML, not PDF (likely permission issues). Falling back to direct insert.`);
+                    } else {
+                        const blob = await pdfResponse.blob();
+                        const fileName = `${row.name || "resume"}.pdf`.replace(/[^a-zA-Z0-9.-]/g, "_");
+                        const pdfFile = new File([blob], fileName, { type: "application/pdf" });
+
+                        const uploadFormData = new FormData();
+                        uploadFormData.append("file", pdfFile);
+
+                        const uploadResult = await uploadResumesAndCreateCandidates(uploadFormData, {
+                            position: metadata?.position,
+                            job_opening: metadata?.job_opening,
+                            domain: metadata?.domain,
+                            source_url: row.resumeUrl,
+                            name: row.name,
+                            email: row.email,
+                        });
+
+                        if (uploadResult.success && uploadResult.candidateId) {
+                            // Merge spreadsheet data overrides
+                            const updateFields: Record<string, unknown> = {};
+                            if (row.name) updateFields.name = row.name;
+                            if (row.email) updateFields.email = row.email;
+                            if (row.phone) updateFields.phone = row.phone;
+                            if (row.location) updateFields.location = row.location;
+                            if (row.experience) updateFields.experience = row.experience;
+                            if (row.role) updateFields.role = row.role;
+                            if (row.skills) updateFields.skills = row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean);
+
+                            // Ensure metadata position/etc are also synced in the update if provided
+                            if (metadata?.position) updateFields.position = metadata.position;
+                            if (metadata?.job_opening) updateFields.job_opening = metadata.job_opening;
+                            if (metadata?.domain) updateFields.domain = metadata.domain;
+
+                            if (Object.keys(updateFields).length > 0) {
+                                const { error: updateError } = await supabase
+                                    .from("candidates")
+                                    .update(updateFields)
+                                    .eq("id", uploadResult.candidateId);
+
+                                if (updateError) console.warn(`⚠️ Batch update failed for ${uploadResult.candidateId}:`, updateError.message);
+                            }
+
+                            revalidatePath("/candidates");
+                            return { success: true, message: "Imported with resume", candidateName: uploadResult.candidateName };
+                        } else {
+                            console.warn(`⚠️ Resume processing failed for ${displayName}: ${uploadResult.message}. Falling back to direct insert.`);
+                        }
+                    }
+                }
+            } catch (aError) {
+                console.warn(`⚠️ Error in resume path for ${displayName}:`, aError instanceof Error ? aError.message : aError, ". Falling back to direct insert.");
             }
         }
 

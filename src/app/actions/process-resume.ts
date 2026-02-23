@@ -7,7 +7,7 @@ import { BedrockRuntimeClient, InvokeModelCommand, ThrottlingException } from "@
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExtractedData {
+export interface ExtractedData {
   name: string;
   email: string;
   phone: string | null;

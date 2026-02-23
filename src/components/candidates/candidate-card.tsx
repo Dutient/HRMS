@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +21,21 @@ import {
   CalendarCheck,
   MapPin,
   Plane,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { deleteCandidate } from "@/app/actions/deleteCandidate";
 import type { Candidate } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -94,6 +106,8 @@ const getInitials = (name: string) =>
 export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleViewProfile = () => {
     if (!candidate.resume_url) {
@@ -111,18 +125,30 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
     window.location.href = `mailto:${candidate.email}?subject=${subject}&body=${body}`;
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm("Delete this candidate? This cannot be undone.")) {
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setShowDeleteDialog(false);
+
       const result = await deleteCandidate(candidate.id);
+
       toast({
         title: result.success ? "Candidate Deleted" : "Error",
         description: result.message,
         variant: result.success ? "default" : "destructive",
       });
+
       if (result.success) {
-        router.refresh(); // Refresh server data — removes card from grid
+        router.refresh();
       }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to delete candidate.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -269,16 +295,60 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-8 w-8 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 shrink-0"
-                  onClick={handleDelete}
+                  className={`h-8 w-8 p-0 shrink-0 transition-colors ${isDeleting ? "text-accent" : "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteDialog(true);
+                  }}
+                  disabled={isDeleting}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  {isDeleting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">Delete candidate</TooltipContent>
+              <TooltipContent side="top" className="text-xs">
+                {isDeleting ? "Deleting..." : "Delete candidate"}
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
+
+        {/* ── Delete Confirmation Dialog ── */}
+        <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <DialogContent className="sm:max-w-[400px] border-none bg-white p-0 overflow-hidden rounded-2xl shadow-2xl">
+            <div className="bg-red-50 p-6 flex flex-col items-center text-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <DialogHeader className="p-0 text-center items-center">
+                <DialogTitle className="text-xl font-bold text-gray-900">Delete Candidate?</DialogTitle>
+                <DialogDescription className="text-gray-600 max-w-[280px]">
+                  This will permanently remove <span className="font-semibold text-gray-900">{candidate.name}</span> and their resume. This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <DialogFooter className="p-4 bg-gray-50 flex flex-row items-center gap-3 sm:justify-center">
+              <Button
+                variant="ghost"
+                className="flex-1 font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 h-11"
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 font-semibold bg-red-600 hover:bg-red-700 h-11 shadow-md shadow-red-100"
+                onClick={handleDelete}
+              >
+                Delete Candidate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </CardContent>
     </Card >
