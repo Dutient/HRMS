@@ -36,12 +36,12 @@ export interface RowProcessResult {
 const COLUMN_MAP: Record<string, keyof SpreadsheetRow> = {};
 
 const ALIASES: [string[], keyof SpreadsheetRow][] = [
-    [["name", "candidate name", "full name", "candidate"], "name"],
+    [["name", "candidate name", "full name", "candidate", "name of candidate"], "name"],
     [["email", "email address", "e-mail", "mail", "email id"], "email"],
-    [["phone", "phone number", "mobile", "contact", "contact number", "mobile number"], "phone"],
-    [["experience", "exp", "years of experience", "total experience", "yrs", "years", "work experience"], "experience"],
-    [["location", "city", "address", "current location", "place"], "location"],
-    [["skills", "skill", "key skills", "skillset", "skill set", "technologies"], "skills"],
+    [["phone", "phone number", "mobile", "contact", "contact number", "mobile number", "whatsapp number"], "phone"],
+    [["experience", "exp", "years of experience", "total experience", "yrs", "years", "work experience", "how many years of experience"], "experience"],
+    [["location", "city", "address", "current location", "place", "what is your current location", "what is your location"], "location"],
+    [["skills", "skill", "key skills", "skillset", "skill set", "technologies", "what is your qualification"], "skills"],
     [["resume url", "resume link", "resume", "cv link", "cv url", "drive link", "google drive link", "link", "submit your resume", "upload resume"], "resumeUrl"],
     [["role", "position", "job title", "designation", "title", "current role"], "role"],
 ];
@@ -209,23 +209,37 @@ export async function processSingleRow(
             }
         }
 
-        // Path B: Direct Upsert (Merge by Email)
+        // Path B: Direct Upsert (Merge by Email - Additive)
         const skillsArray = row.skills ? row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean) : [];
-        const { error } = await supabase.from("candidates").upsert({
-            name: row.name || "Unknown",
-            email: row.email || null,
-            phone: row.phone || null,
-            experience: row.experience || null,
-            location: row.location || null,
-            role: row.role || metadata?.position || "General Application",
-            skills: skillsArray.length > 0 ? skillsArray : null,
-            status: "New",
-            source: "Spreadsheet Import",
-            applied_date: new Date().toISOString().split("T")[0],
-            position: metadata?.position || null,
-            job_opening: metadata?.job_opening || null,
-            domain: metadata?.domain || null,
-        }, {
+
+        const upsertData: any = {
+            email: row.email, // Required for onConflict
+            updated_at: new Date().toISOString()
+        };
+
+        // Only add fields that are actually present to avoid nullifying existing data
+        if (row.name) upsertData.name = row.name;
+        if (row.phone) upsertData.phone = row.phone;
+        if (row.experience !== undefined) upsertData.experience = row.experience;
+        if (row.location) upsertData.location = row.location;
+        if (row.role || metadata?.position) upsertData.role = row.role || metadata?.position;
+        if (skillsArray.length > 0) upsertData.skills = skillsArray;
+        if (row.resumeUrl) {
+            upsertData.resume_url = row.resumeUrl;
+            upsertData.source_url = row.resumeUrl;
+        }
+
+        // Metadata fields
+        if (metadata?.position) upsertData.position = metadata.position;
+        if (metadata?.job_opening) upsertData.job_opening = metadata.job_opening;
+        if (metadata?.domain) upsertData.domain = metadata.domain;
+
+        // Default fields for NEW inserts (will still update on existing, which is generally fine)
+        upsertData.status = "New";
+        upsertData.source = "Spreadsheet Import";
+        upsertData.applied_date = new Date().toISOString().split("T")[0];
+
+        const { error } = await supabase.from("candidates").upsert(upsertData, {
             onConflict: 'email',
             ignoreDuplicates: false
         });

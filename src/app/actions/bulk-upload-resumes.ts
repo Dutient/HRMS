@@ -167,29 +167,37 @@ export async function uploadResumesAndCreateCandidates(
     }
 
     // Step E: Upsert candidate record (Merge by Email)
+    // Step E: Upsert candidate record (Merge by Email - Additive)
+    const upsertData: any = {
+      email: metadata?.email || extractedData.email, // Required for onConflict
+      updated_at: new Date().toISOString()
+    };
+
+    // Only add fields that have values to prevent nullifying existing data
+    if (metadata?.name || extractedData.name) upsertData.name = metadata?.name || extractedData.name;
+    if (extractedData.phone) upsertData.phone = extractedData.phone;
+    if (resumeText) upsertData.resume_text = resumeText;
+    if (extractedData.role) upsertData.role = extractedData.role;
+    if (extractedData.experience !== undefined && extractedData.experience !== null) upsertData.experience = extractedData.experience;
+    if (extractedData.skills && extractedData.skills.length > 0) upsertData.skills = extractedData.skills;
+    if (extractedData.summary) upsertData.summary = extractedData.summary;
+    if (vectorElement) upsertData.embedding = vectorElement;
+    if (resumeUrl) upsertData.resume_url = resumeUrl;
+
+    // Metadata fields
+    if (metadata?.position) upsertData.position = metadata.position;
+    if (metadata?.job_opening) upsertData.job_opening = metadata.job_opening;
+    if (metadata?.domain) upsertData.domain = metadata.domain;
+    if (metadata?.source_url) upsertData.source_url = metadata.source_url;
+
+    // Default fields for NEW inserts
+    upsertData.status = "New";
+    upsertData.source = "Bulk Upload";
+    upsertData.applied_date = new Date().toISOString().split("T")[0];
+
     const { data: candidateData, error: insertError } = await supabase
       .from("candidates")
-      .upsert({
-        name: metadata?.name || extractedData.name,
-        email: metadata?.email || extractedData.email,
-        phone: extractedData.phone,
-        resume_text: resumeText, // Ensure text is stored!
-        role: extractedData.role || "General Application", // Default per requirement
-        experience: extractedData.experience,
-        skills: extractedData.skills,
-        summary: extractedData.summary,
-        status: "New",
-        source: "Bulk Upload",
-        match_score: null,
-        embedding: vectorElement,
-        applied_date: new Date().toISOString().split("T")[0],
-        resume_url: resumeUrl,
-        // Add metadata
-        position: metadata?.position || null,
-        job_opening: metadata?.job_opening || null,
-        domain: metadata?.domain || null,
-        source_url: metadata?.source_url || null,
-      }, {
+      .upsert(upsertData, {
         onConflict: 'email',
         ignoreDuplicates: false // We want to update existing records
       })

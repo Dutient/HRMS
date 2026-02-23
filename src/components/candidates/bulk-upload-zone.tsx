@@ -36,7 +36,8 @@ export function BulkUploadZone() {
     setProgress,
     setUploadedCount,
     setTotalCount,
-    setFilesQueue
+    setFilesQueue,
+    uploadAbortRef
   } = useUpload();
   const { toast } = useToast();
   const router = useRouter();
@@ -68,8 +69,12 @@ export function BulkUploadZone() {
       let errorCount = 0;
 
       for (let i = 0; i < result.files.length; i++) {
-        const file = result.files[i];
+        if (uploadAbortRef.current) {
+          console.log("[BulkUploadZone] Drive import cancelled by user");
+          break;
+        }
 
+        const file = result.files[i];
         setFilesQueue(prev => prev.map((f, idx) => idx === i ? { ...f, status: "processing" } : f));
 
         const res = await processDriveFile(file, result.accessToken, {
@@ -92,10 +97,13 @@ export function BulkUploadZone() {
         setProgress(Math.round((completed / result.files.length) * 100));
       }
 
+      const isCancelled = uploadAbortRef.current;
       toast({
-        title: successCount > 0 ? "Drive Import Complete" : "Drive Import Failed",
-        description: `${successCount} succeeded, ${errorCount} failed.`,
-        variant: errorCount > 0 ? "destructive" : "default",
+        title: isCancelled ? "Drive Import Cancelled" : (successCount > 0 ? "Drive Import Complete" : "Drive Import Failed"),
+        description: isCancelled
+          ? `Stopped at ${successCount + errorCount} files.`
+          : `${successCount} succeeded, ${errorCount} failed.`,
+        variant: (errorCount > 0 || isCancelled) ? "destructive" : "default",
       });
 
       if (successCount > 0) {
@@ -179,6 +187,7 @@ export function BulkUploadZone() {
 
           setFilesQueue(prev => prev.map((f, idx) => batchIndices.includes(idx) ? { ...f, status: "processing" } : f));
 
+          let batchCompleted = 0;
           const batchPromises = batch.map(async (row, localIdx) => {
             const globalIdx = i + localIdx;
             try {
@@ -187,8 +196,15 @@ export function BulkUploadZone() {
                 job_opening: jobOpening || undefined,
                 domain: domain || undefined,
               });
+
+              batchCompleted++;
+              const currentTotalCompleted = i + batchCompleted;
+              setUploadedCount(currentTotalCompleted);
+              setProgress(Math.round((currentTotalCompleted / total) * 100));
+
               return { globalIdx, res };
             } catch (err) {
+              batchCompleted++;
               return { globalIdx, res: { success: false, message: err instanceof Error ? err.message : "Unknown error" } };
             }
           });
@@ -213,10 +229,9 @@ export function BulkUploadZone() {
             }
           }
 
-          const completed = Math.min(i + SPREADSHEET_BATCH_SIZE, total);
-          setUploadedCount(completed);
-          setProgress(Math.round((completed / total) * 100));
+          if (uploadAbortRef.current) break;
 
+          const completed = Math.min(i + SPREADSHEET_BATCH_SIZE, total);
           // If any row in the batch had a resume URL, it likely used Bedrock.
           // Add a small delay to prevent rapid-fire 429s if many have URLs.
           const hasResumeUrls = batch.some(r => r.resumeUrl);
@@ -225,10 +240,13 @@ export function BulkUploadZone() {
           }
         }
 
+        const isCancelled = uploadAbortRef.current;
         toast({
-          title: `Import Complete`,
-          description: `${success} imported successfully. ${failed} failed.`,
-          variant: failed > 0 ? "destructive" : "default",
+          title: isCancelled ? "Import Cancelled" : "Import Complete",
+          description: isCancelled
+            ? `Stopped. ${success} candidates imported.`
+            : `${success} imported successfully. ${failed} failed.`,
+          variant: (failed > 0 || isCancelled) ? "destructive" : "default",
         });
 
         if (success > 0) {
