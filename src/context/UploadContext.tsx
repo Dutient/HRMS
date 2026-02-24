@@ -24,6 +24,7 @@ interface UploadContextType {
   startUpload: (files: File[], metadata?: { position?: string; job_opening?: string; domain?: string }) => Promise<void>;
   clearQueue: () => void;
   cancelUpload: () => void;
+  uploadAbortRef: React.MutableRefObject<boolean>;
 }
 
 const UploadContext = createContext<UploadContextType | undefined>(undefined);
@@ -165,6 +166,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         startUpload,
         clearQueue,
         cancelUpload,
+        uploadAbortRef,
       }}
     >
       {children}

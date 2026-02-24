@@ -67,11 +67,16 @@ function extractTextFromTXT(buffer: Buffer): string {
  * saving input/output tokens on every single upload.
  */
 function extractFieldsWithRegex(text: string): { email: string | null; phone: string | null } {
-  const emailMatch = text.match(/[\w.+\-]+@[\w\-]+\.[a-z]{2,}/i);
-  const phoneMatch = text.match(/(\+?\d[\d\s\-(). ]{7,}\d)/);
+  // Use a more specific email regex and avoid capturing prefixed digits if they belong to a phone number
+  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/i;
+  const emailMatch = text.match(emailRegex);
+
+  // Phone regex: look for patterns common in resumes
+  const phoneRegex = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
+  const phoneMatch = text.match(phoneRegex);
 
   return {
-    email: emailMatch?.[0]?.trim() ?? null,
+    email: emailMatch?.[0]?.toLowerCase().trim() ?? null,
     phone: phoneMatch?.[0]?.trim() ?? null,
   };
 }
@@ -133,6 +138,8 @@ export async function extractDataWithBedrock(
 
   // ③ Reduced prompt — no longer asks for email or phone
   const prompt = `You are a resume parser. Extract information from the resume below and return ONLY a valid JSON object with no extra text.
+  
+  IMPORTANT: Look carefully for the email address and phone number. Sometimes PDF extraction can merge them with other digits or text. Clean them up (e.g., remove any digits that look like they belong to a phone number from the start of an email).
 
 <resume>
 ${truncatedText}
@@ -140,7 +147,9 @@ ${truncatedText}
 
 Return this exact JSON schema:
 {
-    "name": "full name",
+  "name": "full name",
+  "email": "email address",
+  "phone": "phone number or null",
   "role": "inferred job title or role",
   "experience": <integer years>,
   "skills": ["skill1", "skill2"],
@@ -190,29 +199,33 @@ Return this exact JSON schema:
     // eslint-disable-next-line no-control-regex
     jsonText = jsonText.replace(/\u0000/g, "");
 
-    const llmData: LLMExtractedData = JSON.parse(jsonText);
+    const llmData = JSON.parse(jsonText) as LLMExtractedData & { email?: string; phone?: string | null };
 
-    // ④ Validate the LLM returned a name at minimum
+    // ④ Validate the LLM returned a name and email at minimum
     if (!llmData.name) {
       console.warn("⚠️ LLM did not return a name — skipping candidate.");
       return null;
     }
 
-    // ⑤ Merge: LLM fields + regex-extracted email/phone
+    // ⑤ Merge: LLM fields + regex-extracted email/phone as fallbacks
+    const email = (llmData.email || regexEmail || "")?.toLowerCase().trim();
+    const phoneValue = (llmData.phone || regexPhone || null);
+    const phone = typeof phoneValue === 'string' ? phoneValue.trim() : null;
+
     const merged: ExtractedData = {
-      name: llmData.name,
+      name: llmData.name.trim(),
       role: llmData.role ?? "General Application",
       experience: typeof llmData.experience === "number" ? llmData.experience : 0,
       skills: Array.isArray(llmData.skills) ? llmData.skills : [],
       summary: llmData.summary ?? "",
-      email: regexEmail ?? "",   // falls back to empty string; DB insert will fail gracefully if truly missing
-      phone: regexPhone ?? null,
+      email: email,
+      phone: phone,
       current_location: llmData.current_location ?? null,
       is_willing_to_relocate: llmData.is_willing_to_relocate ?? false,
     };
 
     if (!merged.email) {
-      console.warn("⚠️ No email found by regex — skipping candidate.");
+      console.warn("⚠️ No email found — skipping candidate.");
       return null;
     }
 
