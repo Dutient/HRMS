@@ -105,6 +105,8 @@ export async function parseSpreadsheet(formData: FormData): Promise<ParseResult>
                     parsed.experience = parseFloat(String(cellValue)) || 0;
                 } else if (fieldName === "skills") {
                     parsed.skills = String(cellValue);
+                } else if (fieldName === "email") {
+                    (parsed as Record<string, unknown>)[fieldName] = String(cellValue).trim().toLowerCase();
                 } else {
                     (parsed as Record<string, unknown>)[fieldName] = String(cellValue).trim();
                 }
@@ -213,7 +215,7 @@ export async function processSingleRow(
         const skillsArray = row.skills ? row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean) : [];
 
         const upsertData: any = {
-            email: row.email, // Required for onConflict
+            email: row.email?.toLowerCase(), // Required for onConflict (lowercased for merging)
             updated_at: new Date().toISOString()
         };
 

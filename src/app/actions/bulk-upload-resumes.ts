@@ -168,14 +168,17 @@ export async function uploadResumesAndCreateCandidates(
 
     // Step E: Upsert candidate record (Merge by Email)
     // Step E: Upsert candidate record (Merge by Email - Additive)
+    const sanitizedEmail = (metadata?.email || extractedData.email)?.toLowerCase().trim();
+    const candidateName = (metadata?.name || extractedData.name)?.trim();
+
     const upsertData: any = {
-      email: metadata?.email || extractedData.email, // Required for onConflict
+      email: sanitizedEmail, // Required for onConflict (lowercased for merging)
       updated_at: new Date().toISOString()
     };
 
     // Only add fields that have values to prevent nullifying existing data
-    if (metadata?.name || extractedData.name) upsertData.name = metadata?.name || extractedData.name;
-    if (extractedData.phone) upsertData.phone = extractedData.phone;
+    if (candidateName) upsertData.name = candidateName;
+    if (extractedData.phone) upsertData.phone = extractedData.phone.trim();
     if (resumeText) upsertData.resume_text = resumeText;
     if (extractedData.role) upsertData.role = extractedData.role;
     if (extractedData.experience !== undefined && extractedData.experience !== null) upsertData.experience = extractedData.experience;
@@ -194,6 +197,13 @@ export async function uploadResumesAndCreateCandidates(
     upsertData.status = "New";
     upsertData.source = "Bulk Upload";
     upsertData.applied_date = new Date().toISOString().split("T")[0];
+
+    // Check if candidate exists for logging purposes
+    const { data: existingCandidate } = await supabase
+      .from("candidates")
+      .select("id")
+      .eq("email", sanitizedEmail)
+      .single();
 
     const { data: candidateData, error: insertError } = await supabase
       .from("candidates")
@@ -215,7 +225,11 @@ export async function uploadResumesAndCreateCandidates(
       };
     }
 
-    console.log(`✅ Created candidate: ${candidateData.name}`);
+    if (existingCandidate) {
+      console.log(`🔄 Updated existing candidate: ${candidateData.name} (${sanitizedEmail})`);
+    } else {
+      console.log(`✅ Created new candidate: ${candidateData.name} (${sanitizedEmail})`);
+    }
 
     // Note: Auto-scoring removed intentionally.
     // Candidates are inserted with match_score: null.

@@ -482,31 +482,6 @@ export function BulkUploadZone() {
         </CardContent>
       </Card>
 
-      {/* Progress & Status */}
-      {isUploading && (
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <div className="flex justify-between text-sm font-medium">
-              <span>Processing...</span>
-              <div className="flex items-center gap-4">
-                <span>{Math.round(progress)}%</span>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={cancelUpload}
-                  className="h-7 px-3 text-xs"
-                >
-                  Stop Upload
-                </Button>
-              </div>
-            </div>
-            <Progress value={progress} className="h-2" />
-            <p className="text-sm text-text-muted text-center">
-              Processed {uploadedCount} of {totalCount} files
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Selected Files List (or Results Queue) */}
       {(files.length > 0 || (isUploading && filesQueue.length > 0)) && (
