@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, Archivo } from "next/font/google";
 import "./globals.css";
 import { ConditionalLayout } from "@/components/layout/ConditionalLayout";
-import { UploadProvider } from "@/context/UploadContext";
-import { FloatingUploadWidget } from "@/components/FloatingUploadWidget";
+import { Toaster } from "sonner";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -31,13 +30,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${dmSans.variable} ${archivo.variable} antialiased`}
-      >
-        <UploadProvider>
-          <ConditionalLayout>{children}</ConditionalLayout>
-          <FloatingUploadWidget />
-        </UploadProvider>
+      <body className={`${dmSans.variable} ${archivo.variable} antialiased`}>
+        <ConditionalLayout>{children}</ConditionalLayout>
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );
