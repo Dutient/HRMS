@@ -7,10 +7,7 @@ type ActionState = { error?: string; success?: boolean; redirectTo?: string };
 
 const allowedDomain = process.env.NEXT_PUBLIC_ALLOWED_DOMAIN || "dutient.ai";
 const getSiteUrl = () => {
-  const url = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
-  if (url?.startsWith("http")) return url;
-  if (url) return `https://${url}`;
-  return "http://localhost:3000";
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://dutient-hrms-platform.netlify.app";
 };
 
 const isDomainAllowed = (email: string) => email.toLowerCase().endsWith(`@${allowedDomain}`);
@@ -58,6 +55,19 @@ export async function registerWithPassword(_prevState: ActionState, formData: Fo
   });
 
   if (error) return { error: error.message };
+
+  // Notify Slack that a new user registered and needs confirmation
+  const slackWebhook = process.env.SLACK_WEBHOOK_URL;
+  if (slackWebhook) {
+    const supabaseUsersUrl = `https://supabase.com/dashboard/project/${process.env.NEXT_PUBLIC_SUPABASE_URL?.split(".")?.[0]?.split("https://")?.[1]}/auth/users`;
+    await fetch(slackWebhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `🆕 *New HRMS Registration*\n*Name:* ${fullName || "Not provided"}\n*Email:* ${email}\n\n✅ Confirm their account here: <${supabaseUsersUrl}|Supabase Users Dashboard>`,
+      }),
+    }).catch(() => {}); // Don't fail registration if Slack is down
+  }
 
   return { success: true, redirectTo: safeRedirect || "/dashboard" };
 }
