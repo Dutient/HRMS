@@ -102,7 +102,6 @@ export async function uploadResumesAndCreateCandidates(
     try {
       resumeText = await extractTextFromPDF(buffer);
       // 🔐 Sanitize null bytes — Postgres rejects \u0000 in text columns
-      // eslint-disable-next-line no-control-regex
       resumeText = resumeText.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     } catch (err) {
       console.error(`❌ Failed to extract text from PDF:`, err);
@@ -171,7 +170,7 @@ export async function uploadResumesAndCreateCandidates(
     const sanitizedEmail = (metadata?.email || extractedData.email)?.toLowerCase().trim();
     const candidateName = (metadata?.name || extractedData.name)?.trim();
 
-    const upsertData: any = {
+    const upsertData: Record<string, unknown> = {
       email: sanitizedEmail, // Required for onConflict (lowercased for merging)
       updated_at: new Date().toISOString()
     };

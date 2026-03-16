@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 const { createClient } = require("@supabase/supabase-js");
 const fs = require("fs");
@@ -13,7 +14,7 @@ try {
             process.env[key.trim()] = value.trim();
         }
     });
-} catch (e) {
+} catch {
     console.log("Could not load .env.local, checking process.env");
 }
 

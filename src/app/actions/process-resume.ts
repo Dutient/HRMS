@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -196,7 +197,6 @@ Return this exact JSON schema:
     }
 
     // Sanitize null bytes — PostgreSQL rejects \u0000 in text columns
-    // eslint-disable-next-line no-control-regex
     jsonText = jsonText.replace(/\u0000/g, "");
 
     const llmData = JSON.parse(jsonText) as LLMExtractedData & { email?: string; phone?: string | null };
@@ -291,7 +291,6 @@ export async function processResume(formData: FormData): Promise<{
       resumeText = extractTextFromTXT(buffer);
     }
 
-    // eslint-disable-next-line no-control-regex
     resumeText = resumeText.replace(/\u0000/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
     console.log(`✅ Extracted ${resumeText.length} characters of text`);
 

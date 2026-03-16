@@ -9,7 +9,6 @@ import {
   Phone,
   MapPin,
   Briefcase,
-  Calendar,
   Star,
   Users,
 } from "lucide-react";

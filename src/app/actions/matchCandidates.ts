@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
 import { BedrockEmbeddings } from "@langchain/aws";
 import { ChatBedrockConverse } from "@langchain/aws";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import { revalidatePath } from "next/cache";
 
 // Initialize Supabase (Service Role for RLS bypass logic if needed, but normally Anon is fine if policies allow)
@@ -76,8 +77,6 @@ export async function matchCandidates(jobDescription: string, candidateIds?: str
             },
             temperature: 0,
         });
-
-        const results: MatchResult[] = [];
 
         // Process each candidate (could be parallelized)
         // For 5 candidates, serial is okay but `Promise.all` is faster.

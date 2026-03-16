@@ -25,7 +25,6 @@ export async function parseJobDescription(formData: FormData): Promise<{ success
         }
 
         // Sanitize basic null bytes just in case, though usually not an issue for JD display
-        // eslint-disable-next-line no-control-regex
         text = text.replace(/\u0000/g, "");
 
         if (!text.trim()) {

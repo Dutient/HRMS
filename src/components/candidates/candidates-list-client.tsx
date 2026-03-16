@@ -73,14 +73,6 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
     handleFilterChange("relocate", checked ? "true" : "");
   };
 
-  const hasActiveFilters =
-    filters?.position ||
-    filters?.job_opening ||
-    filters?.domain ||
-    filters?.min_exp ||
-    filters?.max_exp ||
-    filters?.relocate;
-
   // Filter candidates based on search query (client-side text search)
   const filteredCandidates = useMemo(() => {
     if (!searchQuery.trim()) {

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { startGoogleOAuth, loginWithPassword } from "@/app/actions/auth";
+import { registerWithPassword, startGoogleOAuth } from "@/app/actions/auth";
 import { Zap, Brain, TrendingUp, Users, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect, useState, useTransition } from "react";
@@ -18,20 +18,21 @@ const initialState = {
   redirectTo: undefined as string | undefined,
 };
 
-function LoginForm({ presetError, redirectPath }: { presetError?: string; redirectPath: string }) {
+function RegisterForm({ presetError, redirectPath }: { presetError?: string; redirectPath: string }) {
   "use client";
 
   const router = useRouter();
-  const [state, formAction] = useActionState(loginWithPassword, initialState);
+  const [state, formAction] = useActionState(registerWithPassword, initialState);
   const [oauthError, setOauthError] = useState<string | undefined>();
   const [isOauthPending, startOauth] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const error = state.error || presetError || oauthError;
 
   useEffect(() => {
     if (state.success) {
-      toast.success("Signed in successfully!", {
-        description: "Welcome back to Dutient HRMS.",
+      toast.success("Account created!", {
+        description: "Welcome to Dutient HRMS. Taking you to the dashboard…",
       });
       // Small delay so the toast renders before navigation
       const t = setTimeout(() => router.push(state.redirectTo || "/dashboard"), 1000);
@@ -65,14 +66,23 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
 
       <div className="flex items-center gap-3 text-xs text-slate-400">
         <span className="h-px flex-1 bg-slate-200" />
-        or sign in with email
+        or register with email
         <span className="h-px flex-1 bg-slate-200" />
       </div>
 
       <form action={formAction} className="space-y-3">
         <input type="hidden" name="redirect" value={redirectPath} />
         <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email Address</Label>
+          <Label htmlFor="name" className="text-sm font-medium text-slate-700">Full Name (optional)</Label>
+          <Input
+            id="name"
+            name="name"
+            placeholder="Jane Cooper"
+            className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-amber-500 focus-visible:ring-amber-500/20"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-sm font-medium text-slate-700">Company Email</Label>
           <Input
             id="email"
             name="email"
@@ -83,16 +93,13 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
           />
         </div>
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
-            <Link href="#" className="text-xs text-amber-500 hover:text-amber-600">Forgot password?</Link>
-          </div>
+          <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
           <div className="relative">
             <Input
               id="password"
               name="password"
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
+              placeholder="At least 8 characters"
               required
               className="border-slate-200 bg-white pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-amber-500 focus-visible:ring-amber-500/20"
             />
@@ -106,6 +113,27 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
             </button>
           </div>
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm" className="text-sm font-medium text-slate-700">Confirm Password</Label>
+          <div className="relative">
+            <Input
+              id="confirm"
+              name="confirm"
+              type={showConfirm ? "text" : "password"}
+              placeholder="Re-enter password"
+              required
+              className="border-slate-200 bg-white pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-amber-500 focus-visible:ring-amber-500/20"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              tabIndex={-1}
+            >
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
         {error && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
@@ -116,7 +144,7 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
           className="w-full bg-amber-500 font-semibold text-slate-950 hover:bg-amber-400"
           size="lg"
         >
-          Sign In
+          Create Account
         </Button>
       </form>
 
@@ -124,27 +152,22 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
         Protected by enterprise-grade security · SOC 2 compliant
       </p>
       <p className="text-center text-sm text-slate-500">
-        Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-semibold text-amber-500 hover:text-amber-600">Register</Link>
+        Already have an account?{" "}
+        <Link href="/login" className="font-semibold text-amber-500 hover:text-amber-600">Sign in</Link>
       </p>
     </div>
   );
 }
 
-export default function LoginPage({
+export default function RegisterPage({
   searchParams,
 }: {
   searchParams?: Promise<{ error?: string; redirect?: string }>;
 }) {
   const params = use(searchParams ?? Promise.resolve({} as { error?: string; redirect?: string }));
-  const errorKey = params.error;
-  const redirectPath = params.redirect || "/dashboard";
   const presetError =
-    errorKey === "domain"
-      ? "Please use your @dutient.ai email."
-      : errorKey === "oauth"
-        ? "Google sign-in failed. Try again or use email/password."
-        : undefined;
+    params.error === "domain" ? "Please use your @dutient.ai email." : undefined;
+  const redirectPath = params.redirect || "/dashboard";
 
   const features = [
     { icon: Brain, label: "AI Resume Scoring" },
@@ -177,11 +200,11 @@ export default function LoginPage({
             AI-Powered Hiring Portal
           </div>
           <h1 className="mb-3 text-[38px] font-heading font-extrabold leading-[1.15] text-white">
-            Your Hiring
-            <span className="block text-amber-400">Command Centre</span>
+            Start hiring
+            <span className="block text-amber-400">smarter today.</span>
           </h1>
           <p className="mb-7 max-w-sm text-[15px] leading-relaxed text-white/50">
-            Source, screen, and hire top talent — all in one secure workspace powered by AI. Built exclusively for the Dutient team.
+            Join the Dutient team workspace. Get AI screening, resume intelligence, and full pipeline analytics — all in one place.
           </p>
           <div className="mb-6 flex flex-wrap gap-2">
             {features.map(({ icon: Icon, label }) => (
@@ -219,13 +242,13 @@ export default function LoginPage({
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10">
               <Zap className="h-6 w-6 text-amber-500" />
             </div>
-            <h2 className="text-[22px] font-heading font-bold text-slate-900">Welcome back</h2>
-            <p className="mt-1 text-sm text-slate-500">Sign in to your Dutient workspace</p>
+            <h2 className="text-[22px] font-heading font-bold text-slate-900">Create your account</h2>
+            <p className="mt-1 text-sm text-slate-500">Join the Dutient hiring portal</p>
           </div>
 
           <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
-              <LoginForm presetError={presetError} redirectPath={redirectPath} />
+              <RegisterForm presetError={presetError} redirectPath={redirectPath} />
             </CardContent>
           </Card>
         </div>

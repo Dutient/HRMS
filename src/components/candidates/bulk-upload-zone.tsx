@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { openGooglePicker } from "@/lib/google-picker";
 import { processDriveFile } from "@/app/actions/process-drive-file";
 import { parseSpreadsheet, processSingleRow } from "@/app/actions/process-spreadsheet";
@@ -27,11 +26,8 @@ export function BulkUploadZone() {
   const {
     startUpload,
     isUploading,
-    progress,
     uploadedCount,
-    totalCount,
     filesQueue,
-    cancelUpload,
     setIsUploading,
     setProgress,
     setUploadedCount,
@@ -136,7 +132,7 @@ export function BulkUploadZone() {
       setIsDriveImporting(false);
       setIsUploading(false);
     }
-  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue]);
+  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue, uploadAbortRef]);
 
   // ── Spreadsheet (CSV/XLSX) Import ──────────────────────────────────────
   const handleSpreadsheetUpload = useCallback(async () => {
@@ -265,7 +261,7 @@ export function BulkUploadZone() {
       }
     };
     input.click();
-  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue]);
+  }, [position, jobOpening, domain, toast, router, setIsUploading, setProgress, setUploadedCount, setTotalCount, setFilesQueue, uploadAbortRef]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
