@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build -- --no-turbopack"
+  command = "npm run build"
   publish = ".next"
 
 # Essential Next.js plugin for Netlify (handles routing automatically)
@@ -9,8 +9,6 @@
 [build.environment]
   # Node version compatible with Next.js 16
   NODE_VERSION = "20"
-  # Force webpack — Turbopack skips nft trace files required by @netlify/plugin-nextjs
-  NEXT_TURBOPACK = "0"
 
 # Headers for security and large file uploads
 [[headers]]
