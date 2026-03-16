@@ -29,7 +29,7 @@ const navigation = [
   },
   {
     name: "Dashboard",
-    href: "/",
+    href: "/dashboard",
     icon: LayoutDashboard,
   },
   // Phase 2 - Commented out for now
