@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Google Picker API utility using Google Identity Services (GSI).
  *
@@ -39,7 +40,6 @@ export interface PickerResult {
 // Script Loaders
 // ────────────────────────────────────────────────────────────────────────────────
 let gapiLoaded = false;
-let pickerLoaded = false;
 
 function loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -64,7 +64,6 @@ async function ensureGapiLoaded(): Promise<void> {
     await new Promise<void>((resolve) =>
         (window as any).gapi.load("picker", () => {
             console.log("[GooglePicker] gapi picker loaded");
-            pickerLoaded = true;
             resolve();
         })
     );

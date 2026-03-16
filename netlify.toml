@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npm run build -- --no-turbopack"
   publish = ".next"
 
 # Essential Next.js plugin for Netlify (handles routing automatically)

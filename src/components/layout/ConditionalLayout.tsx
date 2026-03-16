@@ -8,12 +8,13 @@ import { FloatingUploadWidget } from "@/components/FloatingUploadWidget";
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLoginPage = pathname === "/login";
+  const bareRoutes = ["/login", "/register", "/", "/auth/callback"];
+  const isBarePage = bareRoutes.some((route) =>
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
 
-  // If on login page, render children without navigation
-  if (isLoginPage) {
-    return <>{children}</>;
-  }
+  // Public / auth pages render without app chrome
+  if (isBarePage) return <>{children}</>;
 
   // Normal layout with navigation
   return (

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Supabase Edge Function: Rank Single Candidate
 // This function ranks a single candidate against a JD
 // Deploy with: supabase functions deploy rank-candidates
@@ -101,7 +102,7 @@ Return ONLY a JSON object:
     if (!text) throw new Error('Empty response from Gemini')
 
     // 4. Parse Response
-    let jsonText = text.trim()
+    const jsonText = text.trim()
       .replace(/^```json\s*/, "")
       .replace(/^```\s*/, "")
       .replace(/\s*```$/, "");

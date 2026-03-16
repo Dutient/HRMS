@@ -1,4 +1,4 @@
-import { Settings, User, Palette, Bell, Shield, Clock } from "lucide-react";
+import { User, Palette, Bell, Shield, Clock } from "lucide-react";
 
 export default function SettingsPage() {
     return (

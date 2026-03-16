@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import * as React from "react";
@@ -141,7 +142,7 @@ export function CandidateCard({ candidate, isBestFit }: CandidateCardProps) {
       if (result.success) {
         router.refresh();
       }
-    } catch (err) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to delete candidate.",
