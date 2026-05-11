@@ -14,9 +14,16 @@ export interface SpreadsheetRow {
     phone?: string;
     experience?: number;
     location?: string;
+    willRelocate?: string;       // raw "Yes"/"No" — converted to boolean on upsert
     skills?: string;
     resumeUrl?: string;
     role?: string;
+    qualification?: string;      // "Law", "Engineer", "MBA", "Other"
+    currentCtc?: number;         // in LPA
+    expectedCtc?: number;        // in LPA
+    noticePeriod?: string;       // "Immediate", "15 Days", "30 Days", etc.
+    formSubmittedAt?: string;    // raw timestamp string from Google Form
+    notes?: string;              // free-form notes / Column 1
 }
 
 export interface ParseResult {
@@ -40,11 +47,18 @@ const ALIASES: [string[], keyof SpreadsheetRow][] = [
     [["name", "candidate name", "full name", "candidate", "name of candidate"], "name"],
     [["email", "email address", "e-mail", "mail", "email id"], "email"],
     [["phone", "phone number", "mobile", "contact", "contact number", "mobile number", "whatsapp number"], "phone"],
-    [["experience", "exp", "years of experience", "total experience", "yrs", "years", "work experience", "how many years of experience"], "experience"],
-    [["location", "city", "address", "current location", "place", "what is your current location", "what is your location"], "location"],
-    [["skills", "skill", "key skills", "skillset", "skill set", "technologies", "what is your qualification"], "skills"],
+    [["experience", "exp", "years of experience", "total experience", "yrs", "years", "work experience", "how many years of experience do you have"], "experience"],
+    [["location", "city", "address", "current location", "place", "where are you currently based out of", "what is your current location", "what is your location"], "location"],
+    [["are you open to relocate", "open to relocate", "willing to relocate", "relocate", "relocation", "will relocate", "are you open to relocate to mumbai", "open to relocation"], "willRelocate"],
+    [["skills", "skill", "key skills", "skillset", "skill set", "technologies"], "skills"],
     [["resume url", "resume link", "resume", "cv link", "cv url", "drive link", "google drive link", "link", "submit your resume", "upload resume"], "resumeUrl"],
-    [["role", "position", "job title", "designation", "title", "current role"], "role"],
+    [["role", "job title", "designation", "title", "current role", "applying for"], "role"],
+    [["qualification", "education", "degree", "highest qualification", "what is your qualification"], "qualification"],
+    [["current ctc", "current ctc in lpa", "what is your current ctc", "what is your current ctc in lpa", "ctc", "current salary", "present ctc"], "currentCtc"],
+    [["expected ctc", "expected ctc in lpa", "what is your expected ctc", "what is your expected ctc in lpa", "expected salary", "salary expectation"], "expectedCtc"],
+    [["how soon can you join us", "notice period", "joining timeline", "when can you join", "availability", "how soon can you join", "joining date"], "noticePeriod"],
+    [["timestamp", "form submitted at", "submission time", "submitted at", "date of submission"], "formSubmittedAt"],
+    [["notes", "column 1", "additional notes", "comments", "remarks", "extra info"], "notes"],
 ];
 
 for (const [aliases, key] of ALIASES) {
@@ -54,7 +68,10 @@ for (const [aliases, key] of ALIASES) {
 }
 
 function normalizeHeader(raw: string): string {
-    return raw.trim().toLowerCase().replace(/[_\-*#]/g, " ").replace(/\s+/g, " ");
+    return raw.trim().toLowerCase()
+        .replace(/[_\-*#?.,()!]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 function mapHeaders(headers: string[]): Record<number, keyof SpreadsheetRow> {
@@ -66,6 +83,26 @@ function mapHeaders(headers: string[]): Record<number, keyof SpreadsheetRow> {
         }
     }
     return mapping;
+}
+
+// ── CTC Normalization ─────────────────────────────────────────────────────────
+// HR team standardizes on LPA in the Google Form, so values should already be
+// decimal LPA (e.g. 5.2, 10.55). We still guard against accidental raw rupee
+// entries (>1000) by converting them to LPA.
+
+function normalizeCTC(raw: string): number | null {
+    const val = parseFloat(raw);
+    if (isNaN(val) || val <= 0) return null;
+    // Heuristic: if value > 1000 it's likely in rupees — convert to LPA
+    if (val > 1000) return parseFloat((val / 100000).toFixed(2));
+    return parseFloat(val.toFixed(2));
+}
+
+// ── Relocation Normalization ──────────────────────────────────────────────────
+
+function parseRelocate(raw: string): boolean {
+    const normalized = raw.trim().toLowerCase();
+    return normalized === "yes" || normalized === "true" || normalized === "1" || normalized === "y";
 }
 
 // ── Action 1: Parse Spreadsheet (Fast, only reads data) ──────────────────────
@@ -89,6 +126,9 @@ export async function parseSpreadsheet(formData: FormData): Promise<ParseResult>
         const columnMapping = mapHeaders(headerRow);
         const mappedKeys = Object.values(columnMapping);
 
+        console.log(`📋 Spreadsheet headers detected: ${headerRow.join(", ")}`);
+        console.log(`📋 Mapped fields: ${[...new Set(mappedKeys)].join(", ")}`);
+
         if (!mappedKeys.includes("name") && !mappedKeys.includes("email")) {
             return { success: false, message: "Could not find 'Name' or 'Email' column", rows: [], total: 0 };
         }
@@ -102,14 +142,22 @@ export async function parseSpreadsheet(formData: FormData): Promise<ParseResult>
                 const cellValue = row[Number(colIdx)];
                 if (cellValue === undefined || cellValue === null || String(cellValue).trim() === "") continue;
 
+                const strVal = String(cellValue).trim();
+
                 if (fieldName === "experience") {
-                    parsed.experience = parseFloat(String(cellValue)) || 0;
+                    parsed.experience = parseFloat(strVal) || 0;
+                } else if (fieldName === "currentCtc") {
+                    const ctc = normalizeCTC(strVal);
+                    if (ctc !== null) parsed.currentCtc = ctc;
+                } else if (fieldName === "expectedCtc") {
+                    const ctc = normalizeCTC(strVal);
+                    if (ctc !== null) parsed.expectedCtc = ctc;
                 } else if (fieldName === "skills") {
-                    parsed.skills = String(cellValue);
+                    parsed.skills = strVal;
                 } else if (fieldName === "email") {
-                    (parsed as Record<string, unknown>)[fieldName] = String(cellValue).trim().toLowerCase();
+                    parsed.email = strVal.toLowerCase();
                 } else {
-                    (parsed as Record<string, unknown>)[fieldName] = String(cellValue).trim();
+                    (parsed as Record<string, unknown>)[fieldName] = strVal;
                 }
             }
             if (parsed.name || parsed.email) {
@@ -117,8 +165,10 @@ export async function parseSpreadsheet(formData: FormData): Promise<ParseResult>
             }
         }
 
+        console.log(`✅ Parsed ${parsedRows.length} rows from spreadsheet`);
         return { success: true, rows: parsedRows, total: parsedRows.length };
     } catch (err) {
+        console.error("❌ Spreadsheet parse error:", err);
         return { success: false, message: err instanceof Error ? err.message : "Parse error", rows: [], total: 0 };
     }
 }
@@ -139,25 +189,24 @@ export async function processSingleRow(
         // Path A: Resume URL present → Download & AI Extract
         if (row.resumeUrl) {
             try {
-                console.log(`🔗 Found resume URL: ${row.resumeUrl}`);
+                console.log(`🔗 [${displayName}] Found resume URL: ${row.resumeUrl}`);
 
-                // Helper to handle Google Drive sharing links
                 let finalUrl = row.resumeUrl;
                 if (finalUrl.includes("drive.google.com")) {
-                    const driveIdMatch = finalUrl.match(/\/file\/d\/([^\/]+)/) || finalUrl.match(/id=([^\/&]+)/);
+                    const driveIdMatch = finalUrl.match(/\/file\/d\/([^/]+)/) || finalUrl.match(/id=([^/&]+)/);
                     if (driveIdMatch && driveIdMatch[1]) {
-                        // Use the public download endpoint (confirm=t bypasses the "can't scan for viruses" warning for many files)
                         finalUrl = `https://drive.google.com/uc?export=download&id=${driveIdMatch[1]}&confirm=t`;
+                        console.log(`🔗 [${displayName}] Converted to direct download URL`);
                     }
                 }
 
                 const pdfResponse = await fetch(finalUrl);
                 if (!pdfResponse.ok) {
-                    console.warn(`⚠️ Resume download failed for ${displayName} (HTTP ${pdfResponse.status}) from ${finalUrl}. Falling back to direct insert.`);
+                    console.warn(`⚠️ [${displayName}] Resume download failed (HTTP ${pdfResponse.status}). Falling back to direct insert.`);
                 } else {
                     const contentType = pdfResponse.headers.get("content-type");
                     if (contentType && contentType.includes("text/html")) {
-                        console.warn(`⚠️ Downloaded content for ${displayName} is HTML, not PDF (likely permission issues). Falling back to direct insert.`);
+                        console.warn(`⚠️ [${displayName}] Downloaded HTML instead of PDF (permission issue). Falling back to direct insert.`);
                     } else {
                         const blob = await pdfResponse.blob();
                         const fileName = `${row.name || "resume"}.pdf`.replace(/[^a-zA-Z0-9.-]/g, "_");
@@ -176,17 +225,24 @@ export async function processSingleRow(
                         });
 
                         if (uploadResult.success && uploadResult.candidateId) {
-                            // Merge spreadsheet data overrides
+                            console.log(`✅ [${displayName}] Resume processed via AI pipeline. Merging spreadsheet fields...`);
+
+                            // Merge all spreadsheet fields on top of AI-extracted data
                             const updateFields: Record<string, unknown> = {};
                             if (row.name) updateFields.name = row.name;
                             if (row.email) updateFields.email = row.email;
                             if (row.phone) updateFields.phone = row.phone;
                             if (row.location) updateFields.location = row.location;
-                            if (row.experience) updateFields.experience = row.experience;
+                            if (row.willRelocate !== undefined) updateFields.will_relocate = parseRelocate(row.willRelocate);
+                            if (row.experience !== undefined) updateFields.experience = row.experience;
                             if (row.role) updateFields.role = row.role;
                             if (row.skills) updateFields.skills = row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean);
-
-                            // Ensure metadata position/etc are also synced in the update if provided
+                            if (row.qualification) updateFields.qualification = row.qualification;
+                            if (row.currentCtc !== undefined) updateFields.current_ctc = row.currentCtc;
+                            if (row.expectedCtc !== undefined) updateFields.expected_ctc = row.expectedCtc;
+                            if (row.noticePeriod) updateFields.notice_period = row.noticePeriod;
+                            if (row.formSubmittedAt) updateFields.form_submitted_at = new Date(row.formSubmittedAt).toISOString();
+                            if (row.notes) updateFields.notes = row.notes;
                             if (metadata?.position) updateFields.position = metadata.position;
                             if (metadata?.job_opening) updateFields.job_opening = metadata.job_opening;
                             if (metadata?.domain) updateFields.domain = metadata.domain;
@@ -197,62 +253,82 @@ export async function processSingleRow(
                                     .update(updateFields)
                                     .eq("id", uploadResult.candidateId);
 
-                                if (updateError) console.warn(`⚠️ Batch update failed for ${uploadResult.candidateId}:`, updateError.message);
+                                if (updateError) {
+                                    console.warn(`⚠️ [${displayName}] Spreadsheet field merge failed:`, updateError.message);
+                                } else {
+                                    console.log(`✅ [${displayName}] Spreadsheet fields merged successfully`);
+                                }
                             }
 
                             revalidatePath("/candidates");
                             return { success: true, message: "Imported with resume", candidateName: uploadResult.candidateName };
                         } else {
-                            console.warn(`⚠️ Resume processing failed for ${displayName}: ${uploadResult.message}. Falling back to direct insert.`);
+                            console.warn(`⚠️ [${displayName}] Resume AI processing failed: ${uploadResult.message}. Falling back to direct insert.`);
                         }
                     }
                 }
             } catch (aError) {
-                console.warn(`⚠️ Error in resume path for ${displayName}:`, aError instanceof Error ? aError.message : aError, ". Falling back to direct insert.");
+                console.warn(`⚠️ [${displayName}] Error in resume path:`, aError instanceof Error ? aError.message : aError, ". Falling back to direct insert.");
             }
         }
 
         // Path B: Direct Upsert (Merge by Email - Additive)
+        console.log(`📝 [${displayName}] Inserting directly from spreadsheet data`);
+
         const skillsArray = row.skills ? row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean) : [];
 
         const upsertData: any = {
-            email: row.email?.toLowerCase(), // Required for onConflict (lowercased for merging)
-            updated_at: new Date().toISOString()
+            email: row.email?.toLowerCase(),
+            updated_at: new Date().toISOString(),
         };
 
-        // Only add fields that are actually present to avoid nullifying existing data
         if (row.name) upsertData.name = row.name;
         if (row.phone) upsertData.phone = row.phone;
         if (row.experience !== undefined) upsertData.experience = row.experience;
         if (row.location) upsertData.location = row.location;
+        if (row.willRelocate !== undefined) upsertData.will_relocate = parseRelocate(row.willRelocate);
         if (row.role || metadata?.position) upsertData.role = row.role || metadata?.position;
         if (skillsArray.length > 0) upsertData.skills = skillsArray;
         if (row.resumeUrl) {
             upsertData.resume_url = row.resumeUrl;
             upsertData.source_url = row.resumeUrl;
         }
+        if (row.qualification) upsertData.qualification = row.qualification;
+        if (row.currentCtc !== undefined) upsertData.current_ctc = row.currentCtc;
+        if (row.expectedCtc !== undefined) upsertData.expected_ctc = row.expectedCtc;
+        if (row.noticePeriod) upsertData.notice_period = row.noticePeriod;
+        if (row.formSubmittedAt) {
+            try {
+                upsertData.form_submitted_at = new Date(row.formSubmittedAt).toISOString();
+            } catch {
+                console.warn(`⚠️ [${displayName}] Could not parse form timestamp: ${row.formSubmittedAt}`);
+            }
+        }
+        if (row.notes) upsertData.notes = row.notes;
 
-        // Metadata fields
         if (metadata?.position) upsertData.position = metadata.position;
         if (metadata?.job_opening) upsertData.job_opening = metadata.job_opening;
         if (metadata?.domain) upsertData.domain = metadata.domain;
 
-        // Default fields for NEW inserts (will still update on existing, which is generally fine)
         upsertData.status = "New";
         upsertData.source = "Spreadsheet Import";
         upsertData.applied_date = new Date().toISOString().split("T")[0];
 
+        console.log(`📝 [${displayName}] Upserting with fields: ${Object.keys(upsertData).join(", ")}`);
+
         const { error } = await supabase.from("candidates").upsert(upsertData, {
-            onConflict: 'email',
-            ignoreDuplicates: false
+            onConflict: "email",
+            ignoreDuplicates: false,
         });
 
         if (error) throw new Error(error.message);
-        revalidatePath("/candidates");
 
+        console.log(`✅ [${displayName}] Upserted successfully`);
+        revalidatePath("/candidates");
         return { success: true, message: "Imported directly", candidateName: displayName };
 
     } catch (err) {
+        console.error(`❌ [${displayName}] Process error:`, err);
         return { success: false, message: err instanceof Error ? err.message : "Process error" };
     }
 }

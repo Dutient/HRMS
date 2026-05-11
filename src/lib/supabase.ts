@@ -50,16 +50,23 @@ export interface Candidate {
   match_score: number | null;
   summary: string | null;
   resume_url: string | null;
-  // New filtered fields
+  // Relocation & source
   will_relocate: boolean | null;
   source_url: string | null;
-  // New metadata fields
+  // Metadata fields
   position?: string | null;
   job_opening?: string | null;
   domain?: string | null;
   rating: number | null;
   last_engaged: string | null;
   updated_at: string;
+  // Master schema fields (from Google Form / CSV)
+  qualification: string | null;
+  current_ctc: number | null;
+  expected_ctc: number | null;
+  notice_period: string | null;
+  form_submitted_at: string | null;
+  notes: string | null;
 }
 
 export interface Interview {
