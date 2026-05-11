@@ -183,6 +183,8 @@ export async function uploadResumesAndCreateCandidates(
     if (extractedData.experience !== undefined && extractedData.experience !== null) upsertData.experience = extractedData.experience;
     if (extractedData.skills && extractedData.skills.length > 0) upsertData.skills = extractedData.skills;
     if (extractedData.summary) upsertData.summary = extractedData.summary;
+    if (extractedData.current_location) upsertData.location = extractedData.current_location;
+    if (extractedData.is_willing_to_relocate !== null && extractedData.is_willing_to_relocate !== undefined) upsertData.will_relocate = extractedData.is_willing_to_relocate;
     if (vectorElement) upsertData.embedding = vectorElement;
     if (resumeUrl) upsertData.resume_url = resumeUrl;
 
