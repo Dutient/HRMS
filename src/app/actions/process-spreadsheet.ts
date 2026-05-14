@@ -98,6 +98,18 @@ function normalizeCTC(raw: string): number | null {
     return parseFloat(val.toFixed(2));
 }
 
+// ── Timestamp Parsing ─────────────────────────────────────────────────────────
+// Google Form exports timestamps as "DD/MM/YYYY HH:MM:SS".
+// JS Date() misparses this as MM/DD/YYYY, so we reconstruct manually.
+
+function parseFormTimestamp(raw: string): string | null {
+    const match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/);
+    if (!match) return null;
+    const [, dd, mm, yyyy, hh, min, ss] = match;
+    const date = new Date(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}Z`);
+    return isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 // ── Relocation Normalization ──────────────────────────────────────────────────
 
 function parseRelocate(raw: string): boolean {
@@ -241,7 +253,7 @@ export async function processSingleRow(
                             if (row.currentCtc !== undefined) updateFields.current_ctc = row.currentCtc;
                             if (row.expectedCtc !== undefined) updateFields.expected_ctc = row.expectedCtc;
                             if (row.noticePeriod) updateFields.notice_period = row.noticePeriod;
-                            if (row.formSubmittedAt) updateFields.form_submitted_at = new Date(row.formSubmittedAt).toISOString();
+                            if (row.formSubmittedAt) updateFields.form_submitted_at = parseFormTimestamp(row.formSubmittedAt);
                             if (row.notes) updateFields.notes = row.notes;
                             if (metadata?.position) updateFields.position = metadata.position;
                             if (metadata?.job_opening) updateFields.job_opening = metadata.job_opening;
@@ -298,11 +310,9 @@ export async function processSingleRow(
         if (row.expectedCtc !== undefined) upsertData.expected_ctc = row.expectedCtc;
         if (row.noticePeriod) upsertData.notice_period = row.noticePeriod;
         if (row.formSubmittedAt) {
-            try {
-                upsertData.form_submitted_at = new Date(row.formSubmittedAt).toISOString();
-            } catch {
-                console.warn(`⚠️ [${displayName}] Could not parse form timestamp: ${row.formSubmittedAt}`);
-            }
+            const ts = parseFormTimestamp(row.formSubmittedAt);
+            if (ts) upsertData.form_submitted_at = ts;
+            else console.warn(`⚠️ [${displayName}] Could not parse form timestamp: ${row.formSubmittedAt}`);
         }
         if (row.notes) upsertData.notes = row.notes;
 
