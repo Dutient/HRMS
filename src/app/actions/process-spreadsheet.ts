@@ -128,7 +128,7 @@ export async function parseSpreadsheet(formData: FormData): Promise<ParseResult>
         const workbook = XLSX.read(arrayBuffer, { type: "array" });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rawRows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const rawRows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
 
         if (rawRows.length < 2) {
             return { success: false, message: "Sheet is empty", rows: [], total: 0 };
@@ -253,7 +253,10 @@ export async function processSingleRow(
                             if (row.currentCtc !== undefined) updateFields.current_ctc = row.currentCtc;
                             if (row.expectedCtc !== undefined) updateFields.expected_ctc = row.expectedCtc;
                             if (row.noticePeriod) updateFields.notice_period = row.noticePeriod;
-                            if (row.formSubmittedAt) updateFields.form_submitted_at = parseFormTimestamp(row.formSubmittedAt);
+                            if (row.formSubmittedAt) {
+                                const ts = parseFormTimestamp(row.formSubmittedAt);
+                                if (ts) updateFields.form_submitted_at = ts;
+                            }
                             if (row.notes) updateFields.notes = row.notes;
                             if (metadata?.position) updateFields.position = metadata.position;
                             if (metadata?.job_opening) updateFields.job_opening = metadata.job_opening;
