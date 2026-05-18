@@ -14,7 +14,7 @@ import { ExperienceSlider, RelocationToggle } from "@/components/candidates/filt
 import { RankingModal } from "@/components/candidates/ranking-modal";
 import { rankCandidates } from "@/app/actions/rank-candidates";
 import { backfillEmbeddings } from "@/app/actions/backfill-embeddings";
-import { Sparkles, RefreshCw } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CandidatesListClientProps {
@@ -159,15 +159,6 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
             </div>
 
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handleBackfillEmbeddings}
-                disabled={isBackfilling}
-                title="Generate embeddings for candidates missing them (required for AI ranking)"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${isBackfilling ? "animate-spin" : ""}`} />
-                {isBackfilling ? "Generating..." : "Fix Embeddings"}
-              </Button>
               <Button
                 className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => setIsRankingModalOpen(true)}
