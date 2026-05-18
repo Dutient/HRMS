@@ -13,7 +13,8 @@ import { ExperienceSlider, RelocationToggle } from "@/components/candidates/filt
 
 import { RankingModal } from "@/components/candidates/ranking-modal";
 import { rankCandidates } from "@/app/actions/rank-candidates";
-import { Sparkles } from "lucide-react";
+import { backfillEmbeddings } from "@/app/actions/backfill-embeddings";
+import { Sparkles, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CandidatesListClientProps {
@@ -38,6 +39,7 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
   const [searchQuery, setSearchQuery] = useState("");
   const [isRankingModalOpen, setIsRankingModalOpen] = useState(false);
   const [isRanking, setIsRanking] = useState(false);
+  const [isBackfilling, setIsBackfilling] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -90,6 +92,24 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
     });
   }, [candidates, searchQuery]);
 
+  const handleBackfillEmbeddings = async () => {
+    setIsBackfilling(true);
+    try {
+      const result = await backfillEmbeddings();
+      toast({
+        title: result.processed > 0 ? "Embeddings Generated ✅" : "Nothing to Backfill",
+        description: result.message,
+        variant: result.failed > 0 ? "destructive" : "default",
+      });
+      router.refresh();
+    } catch (error) {
+      console.error("Backfill error:", error);
+      toast({ title: "Backfill Failed", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsBackfilling(false);
+    }
+  };
+
   const handleRankCandidates = async (jobDescription: string) => {
     setIsRanking(true);
     try {
@@ -139,6 +159,15 @@ export function CandidatesListClient({ candidates, filters, options }: Candidate
             </div>
 
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleBackfillEmbeddings}
+                disabled={isBackfilling}
+                title="Generate embeddings for candidates missing them (required for AI ranking)"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${isBackfilling ? "animate-spin" : ""}`} />
+                {isBackfilling ? "Generating..." : "Fix Embeddings"}
+              </Button>
               <Button
                 className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => setIsRankingModalOpen(true)}
