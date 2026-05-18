@@ -17,13 +17,16 @@ export interface BackfillResult {
   message: string;
 }
 
+const BATCH_SIZE = 8; // Stay under Netlify's ~26s function timeout
+
 export async function backfillEmbeddings(): Promise<BackfillResult> {
   console.log("🔄 Starting embedding backfill for candidates with null embedding...");
 
   const { data: candidates, error } = await supabase
     .from("candidates")
     .select("id, name, email, role, skills, experience, location, qualification, resume_text, notes")
-    .is("embedding", null);
+    .is("embedding", null)
+    .limit(BATCH_SIZE);
 
   if (error) {
     console.error("❌ Failed to fetch candidates:", error);
@@ -100,7 +103,17 @@ export async function backfillEmbeddings(): Promise<BackfillResult> {
     }
   }
 
-  const message = `Backfill complete: ${processed} embedded, ${skipped} skipped (no text), ${failed} failed.`;
+  // Check if more remain after this batch
+  const { count } = await supabase
+    .from("candidates")
+    .select("id", { count: "exact", head: true })
+    .is("embedding", null);
+
+  const remaining = count ?? 0;
+  const message = remaining > 0
+    ? `Batch done: ${processed} embedded. ${remaining} more remaining — click again to continue.`
+    : `All done: ${processed} embedded, ${skipped} skipped, ${failed} failed.`;
+
   console.log(`🏁 ${message}`);
   return { success: true, processed, skipped, failed, message };
 }
