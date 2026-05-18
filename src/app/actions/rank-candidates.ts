@@ -146,7 +146,7 @@ export async function rankCandidates(
 
   const chat = new ChatBedrockConverse({
     region: process.env.BEDROCK_AWS_REGION,
-    model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    model: "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
     credentials: {
       accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
       secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
