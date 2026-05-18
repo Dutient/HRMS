@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
 import { uploadResumesAndCreateCandidates } from "./bulk-upload-resumes";
+import { BedrockEmbeddings } from "@langchain/aws";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -292,10 +293,42 @@ export async function processSingleRow(
 
         const skillsArray = row.skills ? row.skills.split(/[,;|]/).map(s => s.trim()).filter(Boolean) : [];
 
+        // Build a text representation of the candidate for embedding
+        const profileText = [
+            row.name ? `Name: ${row.name}` : null,
+            row.role || metadata?.position ? `Role: ${row.role || metadata?.position}` : null,
+            skillsArray.length > 0 ? `Skills: ${skillsArray.join(", ")}` : null,
+            row.experience !== undefined ? `Experience: ${row.experience} years` : null,
+            row.location ? `Location: ${row.location}` : null,
+            row.qualification ? `Qualification: ${row.qualification}` : null,
+            row.notes ? `Notes: ${row.notes}` : null,
+        ].filter(Boolean).join(". ");
+
+        let embeddingVector: number[] | null = null;
+        if (profileText.length > 10) {
+            try {
+                const embeddings = new BedrockEmbeddings({
+                    region: process.env.BEDROCK_AWS_REGION,
+                    model: "amazon.titan-embed-text-v1",
+                    credentials: {
+                        accessKeyId: process.env.BEDROCK_AWS_ACCESS_KEY_ID!,
+                        secretAccessKey: process.env.BEDROCK_AWS_SECRET_ACCESS_KEY!,
+                    },
+                });
+                embeddingVector = await embeddings.embedQuery(profileText);
+                console.log(`🧠 [${displayName}] Embedding generated from profile text`);
+            } catch (embErr) {
+                console.warn(`⚠️ [${displayName}] Embedding generation failed — inserting without embedding:`, embErr);
+            }
+        }
+
         const upsertData: any = {
             email: row.email?.toLowerCase(),
             updated_at: new Date().toISOString(),
         };
+
+        if (profileText.length > 10) upsertData.resume_text = profileText;
+        if (embeddingVector) upsertData.embedding = embeddingVector;
 
         if (row.name) upsertData.name = row.name;
         if (row.phone) upsertData.phone = row.phone;
