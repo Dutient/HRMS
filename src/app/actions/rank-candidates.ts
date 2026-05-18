@@ -77,15 +77,28 @@ export async function rankCandidates(
   const MATCH_LIMIT = 15;
   const MATCH_THRESHOLD = 0.3; // minimum similarity to be considered
 
-  const { data: shortlisted, error: rpcError } = await supabase.rpc(
-    "match_candidates",
-    {
-      query_embedding: jdVector,
-      match_threshold: MATCH_THRESHOLD,
-      match_count: MATCH_LIMIT,
-      filter_ids: candidateIds,
-    }
-  );
+  console.log(`🔗 Calling match_candidates RPC (threshold: ${MATCH_THRESHOLD}, limit: ${MATCH_LIMIT}, ids: ${candidateIds.length})...`);
+
+  let shortlisted: any[] | null = null;
+  let rpcError: any = null;
+  try {
+    const result = await supabase.rpc(
+      "match_candidates",
+      {
+        query_embedding: jdVector,
+        match_threshold: MATCH_THRESHOLD,
+        match_count: MATCH_LIMIT,
+        filter_ids: candidateIds,
+      }
+    );
+    shortlisted = result.data;
+    rpcError = result.error;
+  } catch (rpcException) {
+    console.error("❌ RPC match_candidates threw exception:", rpcException);
+    return { success: false, message: `Vector search exception: ${String(rpcException)}` };
+  }
+
+  console.log(`🔗 RPC returned — data: ${shortlisted?.length ?? "null"}, error: ${rpcError ? JSON.stringify(rpcError) : "none"}`);
 
   if (rpcError) {
     console.error("❌ RPC match_candidates failed:", rpcError);
@@ -93,6 +106,7 @@ export async function rankCandidates(
   }
 
   if (!shortlisted || shortlisted.length === 0) {
+    console.warn("⚠️ No candidates passed the similarity threshold.");
     return {
       success: false,
       message:
