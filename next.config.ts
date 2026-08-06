@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
         "127.0.0.1:3000",
         "dutient-hrms.netlify.app",
         "*.netlify.app", // Allow all Netlify preview deployments
+        "hirestack.dutientlabs.ai",
       ],
     },
   },
