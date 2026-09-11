@@ -2,6 +2,13 @@
 
 import { supabase, isSupabaseConfigured, type Candidate } from "@/lib/supabase";
 
+// All Candidate columns except `embedding` (vector(1536)) — that column is only
+// needed for the match_candidates RPC. Pulling it into list views blows the
+// response past AWS's Lambda/API Gateway payload limit (HTTP 413) once there
+// are a few hundred rows, since every candidate carries 1536 floats.
+const CANDIDATE_LIST_COLUMNS =
+  "id, created_at, name, email, phone, location, avatar_url, role, experience, skills, status, source, applied_date, match_score, summary, resume_url, will_relocate, source_url, position, job_opening, domain, rating, last_engaged, updated_at, qualification, current_ctc, expected_ctc, notice_period, form_submitted_at, notes";
+
 /**
  * Fetch all candidates from the database
  * @param status - Optional status filter
@@ -29,7 +36,7 @@ export async function getCandidates(
   try {
     let query = supabase
       .from("candidates")
-      .select("*")
+      .select(CANDIDATE_LIST_COLUMNS)
       // Order by match_score descending, nulls last, then by created_at
       .order("match_score", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
@@ -90,7 +97,7 @@ export async function getTalentPoolCandidates(): Promise<Candidate[]> {
   try {
     const { data, error } = await supabase
       .from("candidates")
-      .select("*")
+      .select(CANDIDATE_LIST_COLUMNS)
       .eq("status", "Talent Pool")
       .order("rating", { ascending: false });
 
@@ -161,7 +168,7 @@ export async function searchCandidates(
 
     const { data, error } = await supabase
       .from("candidates")
-      .select("*")
+      .select(CANDIDATE_LIST_COLUMNS)
       .or(
         `name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,role.ilike.%${searchQuery}%`
       )
