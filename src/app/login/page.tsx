@@ -2,42 +2,17 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { startGoogleOAuth, loginWithPassword } from "@/app/actions/auth";
-import { Zap, Brain, TrendingUp, Users, Eye, EyeOff } from "lucide-react";
+import { startGoogleOAuth } from "@/app/actions/auth";
+import { Zap, Brain, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
-import { use, useEffect, useState, useTransition } from "react";
-import { useActionState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { use, useState, useTransition } from "react";
 
-const initialState = {
-  error: undefined as string | undefined,
-  success: undefined as boolean | undefined,
-  redirectTo: undefined as string | undefined,
-};
-
-function LoginForm({ presetError, redirectPath }: { presetError?: string; redirectPath: string }) {
+function LoginForm({ presetError }: { presetError?: string }) {
   "use client";
 
-  const router = useRouter();
-  const [state, formAction] = useActionState(loginWithPassword, initialState);
   const [oauthError, setOauthError] = useState<string | undefined>();
   const [isOauthPending, startOauth] = useTransition();
-  const [showPassword, setShowPassword] = useState(false);
-  const error = state.error || presetError || oauthError;
-
-  useEffect(() => {
-    if (state.success) {
-      toast.success("Signed in successfully!", {
-        description: "Welcome back to Dutient HRMS.",
-      });
-      // Small delay so the toast renders before navigation
-      const t = setTimeout(() => router.push(state.redirectTo || "/dashboard"), 1000);
-      return () => clearTimeout(t);
-    }
-  }, [state.success, state.redirectTo, router]);
+  const error = presetError || oauthError;
 
   return (
     <div className="space-y-4">
@@ -63,69 +38,14 @@ function LoginForm({ presetError, redirectPath }: { presetError?: string; redire
         {isOauthPending ? "Redirecting to Google…" : "Continue with Google"}
       </Button>
 
-      <div className="flex items-center gap-3 text-xs text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" />
-        or sign in with email
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <form action={formAction} className="space-y-3">
-        <input type="hidden" name="redirect" value={redirectPath} />
-        <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-sm font-medium text-slate-700">Email Address</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="you@dutient.ai"
-            required
-            className="border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-amber-500 focus-visible:ring-amber-500/20"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="text-sm font-medium text-slate-700">Password</Label>
-            <Link href="#" className="text-xs text-amber-500 hover:text-amber-600">Forgot password?</Link>
-          </div>
-          <div className="relative">
-            <Input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              required
-              className="border-slate-200 bg-white pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:border-amber-500 focus-visible:ring-amber-500/20"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-        {error && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-            {error}
-          </p>
-        )}
-        <Button
-          type="submit"
-          className="w-full bg-amber-500 font-semibold text-slate-950 hover:bg-amber-400"
-          size="lg"
-        >
-          Sign In
-        </Button>
-      </form>
+      {error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <p className="text-center text-xs text-slate-400">
-        Protected by enterprise-grade security · SOC 2 compliant
-      </p>
-      <p className="text-center text-sm text-slate-500">
-        Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-semibold text-amber-500 hover:text-amber-600">Register</Link>
+        Sign in with your @dutient.ai Google account
       </p>
     </div>
   );
@@ -138,12 +58,11 @@ export default function LoginPage({
 }) {
   const params = use(searchParams ?? Promise.resolve({} as { error?: string; redirect?: string }));
   const errorKey = params.error;
-  const redirectPath = params.redirect || "/dashboard";
   const presetError =
     errorKey === "domain"
       ? "Please use your @dutient.ai email."
       : errorKey === "oauth"
-        ? "Google sign-in failed. Try again or use email/password."
+        ? "Google sign-in failed. Please try again."
         : undefined;
 
   const features = [
@@ -225,7 +144,7 @@ export default function LoginPage({
 
           <Card className="border-slate-200 shadow-sm">
             <CardContent className="p-6">
-              <LoginForm presetError={presetError} redirectPath={redirectPath} />
+              <LoginForm presetError={presetError} />
             </CardContent>
           </Card>
         </div>

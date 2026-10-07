@@ -8,9 +8,9 @@ import { FloatingUploadWidget } from "@/components/FloatingUploadWidget";
 
 export function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const bareRoutes = ["/login", "/register", "/", "/auth/callback"];
+  const bareRoutes = ["/login", "/", "/auth/callback", "/access-pending"];
   const isBarePage = bareRoutes.some((route) =>
-    pathname === route || pathname.startsWith(`${route}/`)
+    pathname === route || (route !== "/" && pathname.startsWith(`${route}/`))
   );
 
   // Public / auth pages render without app chrome

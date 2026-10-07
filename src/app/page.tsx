@@ -71,7 +71,7 @@ export default function LandingPage() {
               asChild
               className="bg-amber-500 font-semibold text-slate-950 hover:bg-amber-400"
             >
-              <Link href="/register">Get Started</Link>
+              <Link href="/login">Get Started</Link>
             </Button>
           </div>
         </div>
@@ -101,7 +101,7 @@ export default function LandingPage() {
               size="lg"
               className="bg-amber-500 px-8 text-base font-semibold text-slate-950 hover:bg-amber-400"
             >
-              <Link href="/register">
+              <Link href="/login">
                 Start Hiring <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
@@ -168,7 +168,7 @@ export default function LandingPage() {
               size="lg"
               className="bg-amber-500 px-10 font-semibold text-slate-950 hover:bg-amber-400"
             >
-              <Link href="/register">Create your account</Link>
+              <Link href="/login">Sign in with Google</Link>
             </Button>
           </div>
         </div>
