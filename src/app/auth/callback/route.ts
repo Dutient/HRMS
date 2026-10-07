@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isEmailApproved } from "@/lib/access";
 
 const allowedDomain = process.env.NEXT_PUBLIC_ALLOWED_DOMAIN || "dutient.ai";
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://dutient-hrms-platform.netlify.app";
@@ -7,7 +8,9 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://dutient-hrms-platfo
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("redirect") || "/dashboard";
+  const requested = requestUrl.searchParams.get("redirect") || "";
+  // Only same-site paths ("/candidates"), never "//other-site.com"
+  const next = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/dashboard";
 
   // ✅ Always redirect to production domain, not request.url
   const response = NextResponse.redirect(new URL(next, siteUrl));
@@ -46,6 +49,13 @@ export async function GET(request: NextRequest) {
       const errorUrl = new URL("/login", siteUrl);
       errorUrl.searchParams.set("error", "domain");
       return NextResponse.redirect(errorUrl);
+    }
+
+    // Signed in with a Dutient account but not approved yet → pending page
+    if (!isEmailApproved(email)) {
+      const pendingResponse = NextResponse.redirect(new URL("/access-pending", siteUrl));
+      response.cookies.getAll().forEach((cookie) => pendingResponse.cookies.set(cookie));
+      return pendingResponse;
     }
   }
 
